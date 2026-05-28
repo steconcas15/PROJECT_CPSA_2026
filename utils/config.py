@@ -26,7 +26,7 @@ def _discover_config_path() -> Path:
         return cwd_candidate
 
     # Corretto a parents[1] perché utils.py è dentro la cartella utils/
-    return here.parents[1] / CONFIG_FILENAME
+    return here.parents[2] / CONFIG_FILENAME
 
 CONFIG_PATH = _discover_config_path()
 
