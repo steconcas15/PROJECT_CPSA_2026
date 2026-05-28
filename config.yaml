@@ -60,5 +60,5 @@ policy:
 
 event_queue_size: 1
 
-yolo_model_name: "/home/ubuntu/Desktop/PROJECT_CPSA_2026/Video_pipeline/Yolo_v3u/kv260_train_yolo_v3u.xmodel"
-resnet_model_name: "/home/ubuntu/Desktop/PROJECT_CPSA_2026/Video_pipeline/Resnet18/kv260_train_resnet18_drowsy.xmodel"
+yolo_model_name: "/home/ubuntu/Desktop/PROJECT_CPSA_2026/Video_Pipeline/Yolo_v3u/kv260_train_yolo_v3u.xmodel"
+resnet_model_name: "/home/ubuntu/Desktop/PROJECT_CPSA_2026/Video_Pipeline/Resnet18/kv260_train_resnet18_drowsy.xmodel"
