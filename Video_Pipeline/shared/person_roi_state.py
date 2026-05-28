@@ -3,8 +3,6 @@ import time
 
 # YOLO alpha high: trust detector more, correct quickly.
 YOLO_SMOOTH_ALPHA = 0.85
-# MoveNet alpha lower: smooth noisy keypoint-derived ROI updates.
-MOVENET_SMOOTH_ALPHA = 0.35
 
 
 class PersonRoiState:
@@ -18,14 +16,12 @@ class PersonRoiState:
 
     The state is intended to be:
         - written by YOLO when a person is detected
-        - read by MoveNet for ROI-based cropping
-        - updated by MoveNet from confident keypoints
     """
 
     def __init__(self):
         self._lock = threading.Lock()
 
-        # Latest raw bbox received from YOLO or MoveNet.
+        # Latest raw bbox received from YOLO.
         self._raw_bbox_xyxy = None
 
         # Smoothed bbox returned to consumers.
@@ -36,7 +32,6 @@ class PersonRoiState:
 
         self._confidence = 0.0
         self._timestamp = None
-        self._source = None
 
         self._need_reacquire = True
 
@@ -54,22 +49,7 @@ class PersonRoiState:
         self._update(
             bbox_xyxy=bbox_xyxy,
             confidence=confidence,
-            source="yolo",
             alpha=YOLO_SMOOTH_ALPHA
-        )
-
-    def update_from_movenet(self, bbox_xyxy, confidence):
-        """
-        Update ROI using MoveNet keypoints.
-
-        MoveNet keypoint-derived boxes are usually noisier frame-to-frame,
-        so they use a lower smoothing alpha.
-        """
-        self._update(
-            bbox_xyxy=bbox_xyxy,
-            confidence=confidence,
-            source="movenet",
-            alpha=MOVENET_SMOOTH_ALPHA
         )
 
     # -----------------------------------------------------
@@ -112,7 +92,7 @@ class PersonRoiState:
 
         return x2 > x1 and y2 > y1
 
-    def _update(self, bbox_xyxy, confidence, source, alpha):
+    def _update(self, bbox_xyxy, confidence, alpha):
         if not self._is_valid_bbox(bbox_xyxy):
             return
 
@@ -153,7 +133,6 @@ class PersonRoiState:
             self._smoothed_cxcywh = smoothed
             self._confidence = float(confidence)
             self._timestamp = now
-            self._source = source
             self._need_reacquire = False
 
     # -----------------------------------------------------
@@ -166,7 +145,7 @@ class PersonRoiState:
 
         Returns:
             dict with raw bbox, smoothed bbox, confidence, timestamp,
-            source, and need_reacquire.
+            and need_reacquire.
         """
         with self._lock:
             return {
@@ -174,7 +153,6 @@ class PersonRoiState:
                 "raw_bbox_xyxy": self._raw_bbox_xyxy,
                 "confidence": self._confidence,
                 "timestamp": self._timestamp,
-                "source": self._source,
                 "need_reacquire": self._need_reacquire,
             }
 
@@ -231,5 +209,4 @@ class PersonRoiState:
             self._smoothed_cxcywh = None
             self._confidence = 0.0
             self._timestamp = None
-            self._source = None
             self._need_reacquire = True
