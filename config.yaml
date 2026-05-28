@@ -60,5 +60,5 @@ policy:
 
 event_queue_size: 1
 
-yolo_model_name: "/home/ubuntu/Desktop/PROJECT_CPSA_2026/VIDEO_pipeline/YOLO/pynqdpu.tf_yolov3_voc.DPUCZDX8G_ISA1_B4096.2.5.0.xmodel"
-movenet_model_name: "/home/ubuntu/Desktop/PROJECT_CPSA_2026/VIDEO_pipeline/MOVENET/kv260_MoveNet_int.xmodel"
+yolo_model_name: "/home/ubuntu/Desktop/PROJECT_CPSA_2026/Video_pipeline/Yolo_v3u/kv260_train_yolo_v3u.xmodel"
+movenet_model_name: "/home/ubuntu/Desktop/PROJECT_CPSA_2026/Video_pipeline/Resnet18/kv260_train_resnet18_drowsy.xmodel"
