@@ -39,6 +39,26 @@ try:
 except Exception:
     CONFIG = {}
 
+# LOGGER
+def get_log_path():
+    """
+    Returns the resolved base log path, expanding "~" to the user's home directory.
+    """
+    default_base = str(Path.home() / "Documents" / "STOPME" / "logs")
+    return str(Path(expanduser(CONFIG.get("log_base_path", default_base))))
+
+def actuation_details_enabled() -> bool:
+    return CONFIG.get("enable_actuation_detail", True)
+
+def system_log_enabled() -> bool:
+    return CONFIG.get("enable_system_log", True)
+
+def debug_system_console_enabled() -> bool:
+    return CONFIG.get("debug_system_console", False)
+
+def debug_event_console_enabled() -> bool:
+    return CONFIG.get("debug_event_console", False)
+  
 # YOLO XMODEL PATH
 def get_yolo_path() -> str:
     return str(Path(CONFIG["yolo_model_name"]).expanduser())
