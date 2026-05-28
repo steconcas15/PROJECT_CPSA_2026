@@ -46,5 +46,3 @@ def get_yolo_path() -> str:
 # RESNET18 XMODEL PATH
 def get_resnet_path() -> str:
     return str(Path(CONFIG["resnet_model_name"]).expanduser())
-
-questo è il codice che ho usato io...è sbagliato o e giusto?
