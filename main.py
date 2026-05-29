@@ -1,11 +1,12 @@
 # test_yolo.py
 import time
 
-# Importiamo la memoria condivisa (ROI) e il thread di YOLO
-from VIDEO_pipeline.YOLO.yolo_thread import YoloDpuThread
-from VIDEO_pipeline.shared.person_roi_state import PersonRoiState
+from Video_Pipeline.Yolo_v3u.yolo_v3u_thread import YoloDpuThread
+from Video_Pipeline.shared.person_roi_state import PersonRoiState
 
 from utils.logger import log_system
+# Nota: verifica che all'interno di utils ci sia effettivamente il file video_dashboard.py. 
+# Se nello screenshot non si vede perché la cartella è contratta, l'import corretto è questo:
 from utils.video_dashboard import (
     VideoDashboard,
     register_dashboard_console,
@@ -17,7 +18,7 @@ def main():
     yolo_thread = None
 
     try:
-        # 1. Inizializza la Dashboard grafica (la finestra OpenCV)
+        # Inizializza la Dashboard grafica (la finestra OpenCV)
         dashboard = VideoDashboard(
             window_name="CPSA Dashboard - SOLO YOLO TEST",
             fullscreen=False
@@ -26,21 +27,21 @@ def main():
 
         log_system("[TEST] Initializing minimal YOLO test system...")
 
-        # 2. Crea la struttura ROI di cui YOLO ha bisogno per memorizzare i dati
+        # Crea la struttura ROI di cui YOLO ha bisogno per memorizzare i dati
         roi_state = PersonRoiState()
 
-        # 3. Istanzia il thread di YOLO passandogli la ROI
+        # Istanzia il thread di YOLO passandogli la ROI
         yolo_thread = YoloDpuThread(roi_state=roi_state)
 
-        # 4. Avvia il thread (il motore asincrono si accende in background)
+        # Avvia il thread (il motore asincrono si accende in background)
         yolo_thread.start()
         
-        # 5. Sveglia il thread dallo stato 'idle' per forzare l'apertura della cam
+        # Sveglia il thread dallo stato 'idle' per forzare l'apertura della cam
         yolo_thread.activate()
 
         log_system("[TEST] YOLO System is running. Press 'q' inside the window to exit.")
 
-        # 6. Loop principale: rendering grafico continuo
+        # Loop principale: rendering grafico continuo
         while True:
             # Passiamo 'None' al posto di movenet_thread così la dashboard disegna solo YOLO
             dashboard.render(yolo_thread, None)
@@ -60,7 +61,6 @@ def main():
         log_system(f"[TEST] Unhandled error: {e}", level="ERROR")
 
     finally:
-        # 7. Pulizia di sicurezza alla chiusura
         log_system("[TEST] Shutting down YOLO test...")
         
         if yolo_thread:
