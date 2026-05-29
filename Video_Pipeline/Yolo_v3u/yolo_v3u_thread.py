@@ -102,7 +102,7 @@ def postprocess(output, frame, conf_threshold=0.5, nms_threshold=0.4):
     # Index [0, 1]   -> tx, ty            : Box center offset relative to the top-left corner of the current grid cell.
     # Index [2, 3]   -> tw, th            : Box width and height scale factors (modifiers for the anchor template).
     # Index [4]      -> objectness_score  : Confidence score (0 to 1) that an actual object exists inside this box.
-    # Index [5 to end]-> class_scores (20) : Probability scores for each of the 20 object categories (e.g., car, person).
+    # Index [5 to 6]-> class_scores (1) : Probability scores for the face.
     # =========================================================================================
     output = output.reshape(grid_size, grid_size, num_anchors, 5 + num_classes)
 
