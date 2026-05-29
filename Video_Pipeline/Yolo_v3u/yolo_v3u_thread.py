@@ -117,14 +117,14 @@ def postprocess(output, frame, conf_threshold=0.5, nms_threshold=0.4):
 
                 if obj_score < conf_threshold:
                     continue
-
+                    
+                # Apply standard YOLO decoding formulas relative to the grid cell position
                 bx = (sigmoid(tx) + col) / grid_size
                 by = (sigmoid(ty) + row) / grid_size
-
-                # Ancoraggi normalizzati basati su input size 640
                 bw = np.exp(tw) / grid_size
                 bh = np.exp(th) / grid_size
 
+                # Convert relative ratios (0.0 to 1.0) into absolute camera pixel coordinates
                 x = int((bx - bw / 2) * W)
                 y = int((by - bh / 2) * H)
                 w = int(bw * W)
