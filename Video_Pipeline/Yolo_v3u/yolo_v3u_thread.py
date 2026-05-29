@@ -73,13 +73,37 @@ def postprocess(output, frame, conf_threshold=0.5, nms_threshold=0.4):
     """
     H, W = frame.shape[:2]
 
-    # YOLOv3u di Ultralytics ha una struttura di output mappata in base ai canali dell'ancora.
-    # Adattiamo l'output reshape considerando 1 sola classe ("face") -> 5 + 1 = 6 elementi per ancora
-    # Nota: Se l'output grezzo della tua DPU ha shape differenti, i parametri grid/anchors vanno mappati sul file .xmodel
+    # The image is divided into a 13x13 macro-cell grid
     grid_size = 13
+
+    # Defines the number of predefined bounding box shapes (anchors) evaluated per grid cell.
+    # YOLOv3u tests 3 different aspect ratios at this scale to capture small, medium, and large faces.
     num_anchors = 3
+    
     num_classes = 1
 
+   # =========================================================================================
+    # RESHAPE THE RAW OUTPUT INTO A STRUCTURED 4D GEOMETRIC MATRIX
+    # =========================================================================================
+    # The raw model output is a flat 1D array of continuous numbers. To make sense of it,
+    # we bend it into a 4D tensor with the following dimensions:
+    # 
+    # Shape: (GridY, GridX, Anchors, Properties)
+    # 
+    # 1. GridY & GridX (They are coordinates): The image is divided into a virtual 13x13 chessboard. 
+    #    Each (Y, X) coordinate points to a specific geographic cell in the image.
+    # 2. Anchors (3): Inside each single cell, the network tests 3 pre-defined bounding box 
+    #    shapes (anchor templates) to detect objects of different sizes/aspect ratios.
+    # 3. Properties (5 + num_classes): For each anchor in each cell, the model predicts 
+    #    a specific vector of data. If num_classes = 20, this vector contains 25 elements.
+    # 
+    # Properties Array Layout Breakdown:
+    # -------------------------------------------------------------------------------------
+    # Index [0, 1]   -> tx, ty            : Box center offset relative to the top-left corner of the current grid cell.
+    # Index [2, 3]   -> tw, th            : Box width and height scale factors (modifiers for the anchor template).
+    # Index [4]      -> objectness_score  : Confidence score (0 to 1) that an actual object exists inside this box.
+    # Index [5 to end]-> class_scores (20) : Probability scores for each of the 20 object categories (e.g., car, person).
+    # =========================================================================================
     output = output.reshape(grid_size, grid_size, num_anchors, 5 + num_classes)
 
     boxes = []
