@@ -257,8 +257,11 @@ def postprocess(output, frame, conf_threshold=0.5, nms_threshold=0.4):
 # ------------------- YOLO DPU THREAD ------------------- #
 class YoloDpuThread(threading.Thread):
     """
-    Thread che controlla la telecamera e gestisce l'inferenza di YOLOv3u (Face Detector) sulla DPU.
-    Invia i dati grezzi del volto rilevato alla logica principale/dashboard.
+    Thread that controls the USB camera and runs YOLOv3u inference on the DPU.
+
+    Important GUI rule:
+        This thread does not create OpenCV windows unless debug_window=True.
+        The dashboard should be the normal owner of cv2.imshow() and cv2.waitKey().
     """
 
     def __init__(
@@ -268,6 +271,15 @@ class YoloDpuThread(threading.Thread):
         debug_window: bool = False,
         roi_state=None
     ):
+        """
+        Initialize the YOLO DPU camera thread.
+
+        Args:
+            device_id: Logical identifier for the camera sensor.
+            camera_index: OpenCV camera index.
+            debug_window: If True, show YOLO's own debug window.
+                          Keep False when using VideoDashboard.
+        """
         super().__init__(daemon=True)
 
         self.device_id = device_id
@@ -285,7 +297,6 @@ class YoloDpuThread(threading.Thread):
         self.latest_result_ts = None
         self.latest_frame = None
 
-        # Variabili aggiornate per il tracciamento dei volti
         self.latest_face_bbox = None
         self.latest_face_conf = 0.0
         self.latest_face_bbox_ts = None
