@@ -18,8 +18,22 @@ CLASS_NAMES = ["face"]
 # ---------------------- PREPROCESS FUNCTION ---------------------- #
 def preprocess(frame, input_shape):
     """
-    Ridimensiona e normalizza il frame della telecamera per il modello DPU.
+    Resizes, normalizes, and prepares a camera frame for DPU model execution.
+
+    Steps:
+    1. Extracts target dimensions from the DPU model's expected input shape.
+    2. Geometrically resizes the frame to match the network requirements.
+    3. Normalizes pixel values from [0, 255] integers to [0.0, 1.0] float32.
+    4. Forces memory layout to be contiguous for optimized hardware DMA transfer.
+
+    Args:
+        frame (numpy.ndarray): Raw BGR image captured from the webcam.
+        input_shape (tuple): Expected model input shape from DPU metadata (Batch, H, W, C).
+
+    Returns:
+        numpy.ndarray: Preprocessed float32 image ready for DPU inference.
     """
+    
     height, width = input_shape[1], input_shape[2]
     image = cv2.resize(frame, (width, height))
     image = image.astype(np.float32) / 255.0
