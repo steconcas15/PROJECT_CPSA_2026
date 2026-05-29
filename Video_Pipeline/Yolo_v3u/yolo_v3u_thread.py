@@ -161,13 +161,30 @@ def postprocess(output, frame, conf_threshold=0.5, nms_threshold=0.4):
                 w = int(bw * W)
                 h = int(bh * H)
 
+                # =========================================================================================
+                # 1. CLASS PROBABILITIES & COMBINED CONFIDENCE FILTERING
+                # =========================================================================================
+                # Extract all class scores starting from index 5 to the end. 
+                # Apply sigmoid to squash values into clean probability percentages (0.0 to 1.0).
                 class_probs = sigmoid(output[row, col, a, 5:])
+
+                # Calculate the absolute final confidence score.
+                # Combined Confidence = Probability of ANY object existing (obj_score) 
+                #                       MULTIPLIED BY the probability that it is specifically a face (class_probs[0]).
                 confidence = float(obj_score * class_probs[0])
 
+                # Hard Threshold Filter: If the final confidence doesn't clear our minimal barrier,
+                # immediately drop this candidate box and move to the next anchor/grid cell.
                 if confidence > conf_threshold:
                     boxes.append([x, y, w, h])
                     confidences.append(confidence)
 
+    # =========================================================================================
+    # 2. NON-MAXIMUM SUPPRESSION (NMS) - REDUNDANCY CLEANUP
+    # =========================================================================================
+    # Because neighboring grid cells often detect the exact same face, we get multiple overlapping boxes.
+    # cv2.dnn.NMSBoxes evaluates overlapping areas (IoU) and keeps ONLY the highest-scoring box per object,
+    # effectively suppressing all weaker duplicate boxes. It returns a list of surviving indices.
     indices = cv2.dnn.NMSBoxes(
         boxes,
         confidences,
@@ -175,35 +192,54 @@ def postprocess(output, frame, conf_threshold=0.5, nms_threshold=0.4):
         nms_threshold
     )
 
+    # Initialize tracking variables for the single best target in the current frame
     face_detected = False
     best_face_bbox = None
     best_face_conf = 0.0
 
+    # =========================================================================================
+    # 3. SELECTING THE BEST FACE & APPLYING 30% VISUAL PADDING
+    # =========================================================================================
     if len(indices) > 0:
         face_detected = True
         
-        # Trova il volto con la confidenza più alta
+        # Flatten the NMS index array to easily loop through all surviving boxes
         for i in indices.flatten():
             conf = float(confidences[i])
+
+            # Continuous comparison to find the absolute champion box (highest confidence score)
             if conf > best_face_conf:
                 best_face_conf = conf
                 x, y, w, h = boxes[i]
                 
-                # Applica il padding del 30% (Preso dal tuo script di Colab)
+                # Target Bounding Boxes are often tightly cropped around facial features (eyes/nose/mouth).
+                # To prevent clipping ears, hair, or jawlines, we compute a 30% margin buffer based on size.
                 pad_h = int(h * 0.3)
                 pad_w = int(w * 0.3)
 
+                # Expand box boundaries while strictly keeping coordinates within physical camera frame limits.
+                # max(0, ...) prevents coordinates from jumping off the left/top edges into negative space.
+                # min(W-1, ...) prevents coordinates from overflowing past the right/bottom resolution edges.
                 xmin = max(0, int(x - pad_w))
                 ymin = max(0, int(y - pad_h))
                 xmax = min(W - 1, int(x + w + pad_w))
                 ymax = min(H - 1, int(y + h + pad_h))
-                
+
+                # Save the final optimized, padded box coordinates
                 best_face_bbox = (xmin, ymin, xmax, ymax)
 
-        # Se abbiamo un volto valido con padding coerente, disegna il riquadro di base
+        # =========================================================================================
+        # 4. RENDERING VISUALS ON SCREEN
+        # =========================================================================================
         if best_face_bbox is not None:
             xmin, ymin, xmax, ymax = best_face_bbox
+
+            # Draw a solid white bounding box rectangle over the original frame (Thickness = 2 pixels)
             cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (255, 255, 255), 2)
+
+            # Overlay text showing confidence percentage (e.g., "Face 0.94").
+            # The text is dynamically anchored 5 pixels ABOVE the top line (ymin - 5), 
+            # using max(0, ...) to ensure the text stays visible even if the face hits the top border.
             cv2.putText(
                 frame,
                 f"Face {best_face_conf:.2f}",
@@ -213,7 +249,8 @@ def postprocess(output, frame, conf_threshold=0.5, nms_threshold=0.4):
                 (255, 255, 255),
                 1
             )
-
+            
+    # Output processed frame alongside metadata to be used by downstream pipeline tasks
     return frame, face_detected, best_face_bbox, best_face_conf
 
 
