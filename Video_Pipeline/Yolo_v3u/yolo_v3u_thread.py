@@ -44,7 +44,16 @@ def preprocess(frame, input_shape):
 # ---------------------- SIGMOID FUNCTION ---------------------- #
 def sigmoid(x):
     """
-    Funzione di attivazione sigmoid per i punteggi di confidenza.
+    Applies the Sigmoid activation function to map raw DPU output scores.
+
+    The DPU outputs raw unbounded values (logits) ranging from -inf to +inf. 
+    This function scales them mathematically into a [0.0, 1.0] probability range.
+
+    Args:
+        x (numpy.ndarray or float): Raw logit value(s) from the model output.
+
+    Returns:
+        numpy.ndarray or float: Activated values representing confidence probabilities.
     """
     return 1 / (1 + np.exp(-x))
 
