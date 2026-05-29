@@ -95,7 +95,7 @@ def postprocess(output, frame, conf_threshold=0.5, nms_threshold=0.4):
     # 2. Anchors (3): Inside each single cell, the network tests 3 pre-defined bounding box 
     #    shapes (anchor templates) to detect objects of different sizes/aspect ratios.
     # 3. Properties (5 + num_classes): For each anchor in each cell, the model predicts 
-    #    a specific vector of data. If num_classes = 20, this vector contains 25 elements.
+    #    a specific vector of data. If num_classes = 1, this vector contains 6 elements.
     # 
     # Properties Array Layout Breakdown:
     # -------------------------------------------------------------------------------------
