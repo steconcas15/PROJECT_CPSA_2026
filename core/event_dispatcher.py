@@ -169,7 +169,9 @@ class EventDispatcher:
 
     def _apply_video_state_for_tag(self, tag):
         """
-
+        Camera logic: 
+        If tag is 1 (Suspect) or 2 (Confirmed), camera must be on.
+        YOLO finds the face -> ResNet confirms drowsiness.
         """
 
         if tag in (1,2):
@@ -177,6 +179,7 @@ class EventDispatcher:
                 self._activate_yolo()
             return
 
+            # If YOLO is active, look for the person/face bounding box
             if self._video_stage == "yolo_active":
                 if self.yolo_thread is None:
                     return
@@ -201,6 +204,7 @@ class EventDispatcher:
 
                     return
 
+                # Timeout if YOLO cannot find the driver
                 if self._yolo_started_ts is not None:
                     yolo_elapsed = time.monotonic() - self._yolo_started_ts
 
@@ -214,6 +218,7 @@ class EventDispatcher:
 
                 return
 
+            # If ResNet is active, check if tracking is lost (roi_state)
             if self._video_stage == "resnet_active":
                 if self.resnet_thread is None:
                     return
@@ -240,7 +245,7 @@ class EventDispatcher:
                     self._activate_resnet()
 
                 return
-
+        # If tag is 0 (Awake), turn off the camera to save resources
         self._stop_video_threads()
 
     def _trigger_policy_action(self, event):
@@ -260,7 +265,8 @@ class EventDispatcher:
         if not result:
             log_system("[Dispatcher] Policy returned no action.")
             return None
-            
+
+        # Pass parameters to the actuator manager using the new action_type
         action_type = result["params"].get("action_type", "drowsiness_event")
         
         self.actuator_manager.trigger(
@@ -272,6 +278,7 @@ class EventDispatcher:
         return result
 
     def _should_trigger_policy(self, tag, now_time):
+       # ACTUATION TRIGGER: happens ONLY if drowsiness is confirmed (tag == 2)
         if tag != 2:
             return False
 
