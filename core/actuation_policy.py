@@ -16,7 +16,7 @@ from utils.config import get_policy_attempts
 TAG_NON_DROWSY = 0
 TAG_DROWSY = 1
 
-class DrowsinessDetection:
+class DrowsinessActivationPolicy:
     """
     Event-driven loop:
       - For tag 1,2: emit one actuation per event.
