@@ -9,12 +9,10 @@ import time
 from utils.event_queue import get_event_queue
 from utils.logger import log_system, log_event
 
-
 LABELS = {
-    0: "NO_CLASS",
-    1: "NON_DANGEROUS",
-    2: "DANGEROUS",
-    3: "NON_STEREOTIPY",
+    0: "AWAKE",                  # No drowsiness
+    1: "SUSPECT_DROWSINESS",     # BlueCoin detects suspect head movement
+    2: "CONFIRMED_DROWSINESS",   # Yolo+ResNet confirm drowsiness
 }
 
 ACTUATION_COOLDOWN = 5
@@ -27,15 +25,13 @@ YOLO_REACQUIRE_TIMEOUT_SEC = 5.0
 
 class EventDispatcher:
     """
-    Consumes IMU classifier events and dispatches actions via activation policy.
+    Consumes IMU & Video events and dispatches actions via activation policy.
 
     Video behavior:
-        - Video state follows the latest IMU tag.
-        - Video activation is non-blocking.
-        - For tag=1: YOLO stays active while tag remains 1.
-        - For tag=2: YOLO runs first; after person detection, YOLO stops and MoveNet starts.
-        - YOLO and MoveNet are never active together.
-        - For tag=0 or tag=3: all video threads stop.
+        - tag=1 (Suspect) or tag=2 (Confirmed): Activate Video Pipeline.
+        - YOLO runs first to find the driver's face.
+        - Once the face is found, YOLO stops and ResNet starts classifying drowsiness.
+        - tag=0 (Awake): Stop all video threads.
     """
 
     def __init__(
@@ -43,7 +39,7 @@ class EventDispatcher:
             actuator_manager,
             policy,
             yolo_thread=None,
-            movenet_thread=None,
+            resnet_thread=None,
             roi_state=None,
         ):
         self.actuator_manager = actuator_manager
@@ -61,13 +57,13 @@ class EventDispatcher:
         self._latest_event = None
 
         self.yolo_thread = yolo_thread
-        self.movenet_thread = movenet_thread
+        self.resnet_thread = resnet_thread
 
-        # None | "yolo_tag1" | "yolo_tag2" | "movenet_tag2"
+        # None | "yolo_active" | "resnet_active"
         self._video_stage = None
 
         self._last_yolo_reacquire_request_ts = None
-        self._yolo_tag2_started_ts = None
+        self._yolo_started_ts = None
 
     def start(self):
         self._thread.start()
@@ -119,22 +115,22 @@ class EventDispatcher:
             self.yolo_thread.deactivate()
             self._wait_thread_idle(self.yolo_thread, "YOLO")
 
-        if self.movenet_thread and self.movenet_thread.is_active():
-            log_system("[Dispatcher] Stopping MoveNet thread.", level="INFO")
-            self.movenet_thread.deactivate()
-            self._wait_thread_idle(self.movenet_thread, "MoveNet")
+        if self.resnet_thread and self.resnet_thread.is_active():
+            log_system("[Dispatcher] Stopping ResNet thread.", level="INFO")
+            self.resnet_thread.deactivate()
+            self._wait_thread_idle(self.resnet_thread, "ResNet")
 
         self._video_stage = None
-        self._yolo_tag2_started_ts = None
+        self._yolo_started_ts = None
 
         if self.roi_state is not None:
             self.roi_state.clear()
 
     def _activate_yolo(self, stage):
-        if self.movenet_thread and self.movenet_thread.is_active():
-            log_system("[Dispatcher] Stopping MoveNet before activating YOLO.", level="INFO")
-            self.movenet_thread.deactivate()
-            self._wait_thread_idle(self.movenet_thread, "MoveNet")
+        if self.resnet_thread and self.resnet_thread.is_active():
+            log_system("[Dispatcher] Stopping ResNet before activating YOLO.", level="INFO")
+            self.resnet_thread.deactivate()
+            self._wait_thread_idle(self.resnet_thread, "ResNet")
 
         if self.yolo_thread is None:
             log_system("[Dispatcher] YOLO thread not configured.", level="WARNING")
@@ -149,50 +145,39 @@ class EventDispatcher:
 
         self._video_stage = stage
 
-        if stage == "yolo_tag2" and previous_stage != "yolo_tag2":
-            self._yolo_tag2_started_ts = time.monotonic()
+        if previous_stage != stage:
+            self._yolo_started_ts = time.monotonic()
 
-    def _activate_movenet(self, stage):
+    def _activate_resnet(self, stage):
         if self.yolo_thread and self.yolo_thread.is_active():
-            log_system("[Dispatcher] Stopping YOLO before activating MoveNet.", level="INFO")
+            log_system("[Dispatcher] Stopping YOLO before activating ResNet.", level="INFO")
             self.yolo_thread.deactivate()
             self._wait_thread_idle(self.yolo_thread, "YOLO")
 
-        if self.movenet_thread is None:
-            log_system("[Dispatcher] MoveNet thread not configured.", level="WARNING")
+        if self.resnet_thread is None:
+            log_system("[Dispatcher] ResNet thread not configured.", level="WARNING")
             self._video_stage = None
             return
 
-        if not self.movenet_thread.is_active():
-            log_system(f"[Dispatcher] Activating MoveNet. stage={stage}", level="INFO")
-            self.movenet_thread.activate()
+        if not self.resnet_thread.is_active():
+            log_system(f"[Dispatcher] Activating ResNet. stage={stage}", level="INFO")
+            self.resnet_thread.activate()
 
         self._video_stage = stage
 
-        if stage == "movenet_tag2":
-            self._yolo_tag2_started_ts = None
+        self._yolo_started_ts = None
 
     def _apply_video_state_for_tag(self, tag):
         """
-        Non-blocking video state update.
 
-        tag 0: stop video
-        tag 1: YOLO only while tag remains 1
-        tag 2: YOLO first; when person detected, switch to MoveNet
-        tag 3: stop video
         """
 
-        if tag == 1:
-            if self._video_stage != "yolo_tag1":
-                self._activate_yolo("yolo_tag1")
+        if tag in (1,2):
+            if self._video_stage is None:
+                self._activate_yolo()
             return
 
-        if tag == 2:
-            if self._video_stage is None or self._video_stage == "yolo_tag1":
-                self._activate_yolo("yolo_tag2")
-                return
-
-            if self._video_stage == "yolo_tag2":
+            if self._video_stage == "yolo_active":
                 if self.yolo_thread is None:
                     return
 
@@ -209,19 +194,19 @@ class EventDispatcher:
                     log_system(
                         f"[Dispatcher] Fresh YOLO person ROI acquired for tag=2. "
                         f"bbox={person_bbox}, conf={person_conf:.2f}. "
-                        f"Switching to MoveNet.",
+                        f"Switching to ResNet.",
                         level="INFO",
                     )
-                    self._activate_movenet("movenet_tag2")
+                    self._activate_resnet()
 
                     return
 
-                if self._yolo_tag2_started_ts is not None:
-                    yolo_elapsed = time.monotonic() - self._yolo_tag2_started_ts
+                if self._yolo_started_ts is not None:
+                    yolo_elapsed = time.monotonic() - self._yolo_started_ts
 
                     if yolo_elapsed >= YOLO_REACQUIRE_TIMEOUT_SEC:
                         log_system(
-                            f"[Dispatcher] YOLO tag=2 reacquisition timed out after "
+                            f"[Dispatcher] YOLO reacquisition timed out after "
                             f"{yolo_elapsed:.1f}s. Stopping video threads.",
                             level="WARNING",
                         )
@@ -229,8 +214,8 @@ class EventDispatcher:
 
                 return
 
-            if self._video_stage == "movenet_tag2":
-                if self.movenet_thread is None:
+            if self._video_stage == "resnet_active":
+                if self.resnet_thread is None:
                     return
 
                 if self.roi_state is not None and self.roi_state.needs_reacquire():
@@ -245,14 +230,14 @@ class EventDispatcher:
                     self._last_yolo_reacquire_request_ts = now
 
                     log_system(
-                        "[Dispatcher] MoveNet requested ROI reacquisition. Switching back to YOLO.",
+                        "[Dispatcher] ResNet requested ROI reacquisition. Switching back to YOLO.",
                         level="INFO",
                     )
-                    self._activate_yolo("yolo_tag2")
+                    self._activate_yolo()
                     return
 
-                if not self.movenet_thread.is_active():
-                    self._activate_movenet("movenet_tag2")
+                if not self.resnet_thread.is_active():
+                    self._activate_resnet()
 
                 return
 
@@ -260,7 +245,7 @@ class EventDispatcher:
 
     def _trigger_policy_action(self, event):
         log_system(
-            f"[Dispatcher POLICY IN] tag={event.get('stereotipy_tag')} "
+            f"[Dispatcher POLICY IN] tag={event.get('drowsiness_tag')} "
             f"source={event.get('source')}",
             level="INFO",
         )
@@ -275,17 +260,19 @@ class EventDispatcher:
         if not result:
             log_system("[Dispatcher] Policy returned no action.")
             return None
-
+            
+        action_type = result["params"].get("action_type", "drowsiness_event")
+        
         self.actuator_manager.trigger(
             actuator_id=result["actuator_id"],
-            action_type="stereotipy_event",
+            action_type=action_type,
             **result["params"],
         )
 
         return result
 
     def _should_trigger_policy(self, tag, now_time):
-        if tag not in (1, 2):
+        if tag != 2:
             return False
 
         return (
@@ -323,7 +310,7 @@ class EventDispatcher:
                 continue
 
             try:
-                raw_tag = event.get("stereotipy_tag", "")
+                raw_tag = event.get("drowsiness_tag", "")
 
                 try:
                     tag = int(raw_tag)
@@ -373,7 +360,7 @@ class EventDispatcher:
                         feature_type="imu",
                         event=label,
                         actuations=actuations,
-                        source=event.get("source", "dual_wrist"),
+                        source=event.get("source", "system"),
                     )
 
             except Exception as e:
