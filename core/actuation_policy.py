@@ -57,7 +57,7 @@ class DrowsinessActivationPolicy:
         if not self.actuator_ids:
             return None
 
-        tag = self._parse_tag(event.get("drowsiness_tag", event.get("stereotipy_tag")))
+        tag = self._parse_tag(event.get("drowsiness_tag"))
         now = time.monotonic()
 
         # Back to non-stereotypy: reset.
