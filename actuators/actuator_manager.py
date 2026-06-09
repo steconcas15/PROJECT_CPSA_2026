@@ -18,7 +18,7 @@ from utils.config import get_speaker_config, get_metamotion_config
 class ActuatorManager:
     """
     Manages discovery, initialization, and control of actuator devices
-    such as LED strips, MetaMotion haptics, and bluetooth speakers.
+    such as MetaMotion haptics and bluetooth speakers.
 
     Provides a unified interface for triggering action on any actuator.
     """
