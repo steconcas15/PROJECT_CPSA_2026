@@ -1,7 +1,7 @@
 # actuator_manager.py
 # Manages scanning, initialization and lifecycle of actuator devices (LED, speaker, MetaMotionRL).
 #
-# Author: Francesco Urru
+# Author: Fabio Piras and Sara Caddeo
 # GitHub: https://github.com/frarvo
 # Repository: https://github.com/frarvo/CPSA_2026
 # License: MIT
