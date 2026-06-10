@@ -58,7 +58,18 @@ def debug_system_console_enabled() -> bool:
 
 def debug_event_console_enabled() -> bool:
     return CONFIG.get("debug_event_console", False)
-  
+# METAMOTION
+def get_metamotion_config() -> dict:
+    return CONFIG.get("metamotion", {})
+
+# SPEAKER
+def get_speaker_config() -> dict:
+    return CONFIG.get("speaker", {})
+
+# BLUECOIN
+def get_bluecoin_config() -> list[dict]:
+    return CONFIG.get("bluecoins", []) or []
+
 # YOLO XMODEL PATH
 def get_yolo_path() -> str:
     return str(Path(CONFIG["yolo_model_name"]).expanduser())
