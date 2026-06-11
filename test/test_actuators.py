@@ -26,10 +26,10 @@ with patch("bluepy.btle.Scanner") as mock_scanner, \
     ]
     mock_lib.mbl_mw_haptic_start_motor.side_effect = fake_haptic
 
-    # ---- Importa i tuoi moduli ----
+
     from actuators.BLE.metamotion import MetaMotionThread
-    from actuation_policy import DrowsinessActivationPolicy
-    from core.actuator_manager import ActuatorManager
+    from core.actuation_policy import DrowsinessActivationPolicy
+    from actuators.actuator_manager import ActuatorManager
     from utils.event_queue import get_event_queue, enqueue_drop_oldest
     from core.event_dispatcher import EventDispatcher
 
