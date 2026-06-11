@@ -1,58 +1,42 @@
 import time
-
-from actuators.actuator_manager import ActuatorManager
-
-from core.actuation_policy import StereotipyActivationPolicy
-from core.event_dispatcher import EventDispatcher
-
+from event_dispatcher import EventDispatcher
+from actuator_manager import ActuatorManager
 from utils.logger import log_system
-from utils.config import get_bluecoin_config
 
-def main():
-    actuator_manager = None
-
-    try:
-        log_system("[MAIN] Initializing STOPme system...")
-
-        actuator_manager = ActuatorManager()
-
-        actuator_manager.scan_actuators()
-
-        actuator_manager.initialize_actuators()
-
-        actuators_list = actuator_manager.get_actuators_ids()
-
-        if not actuators_list:
-            log_system("[MAIN] No actuators discovered. Event detection and logging still executing")
-
-        policy = StereotipyActivationPolicy(actuator_ids=actuators_list)
-
-        dispatcher = EventDispatcher(
-            actuator_manager=actuator_manager,
-            policy=policy,
-            yolo_thread=yolo_thread,
-            movenet_thread=movenet_thread,
-            roi_state=roi_state,
-        )
-
+def run_test():
+    """
+    Script di test per verificare il workflow:
+    Evento -> EventDispatcher -> Policy -> ActuatorManager -> Attuatore
+    """
+    print("--- Inizializzazione Ambiente di Test ---")
+    
+    # 1. Inizializziamo il gestore degli attuatori
+    manager = ActuatorManager()
+    
+    # 2. Inizializziamo il dispatcher
+    # Supponendo che il dispatcher sia in grado di inviare eventi al manager
+    dispatcher = EventDispatcher()
+    
+    # 3. Definiamo una lista di eventi di test da simulare
+    test_events = [
+        {"tag": "movement_detected", "priority": 1},
+        {"tag": "system_error", "priority": 0}
+    ]
+    
+    print(f"--- Lancio di {len(test_events)} eventi di prova ---")
+    
+    for event in test_events:
+        print(f"\n[TEST] Invio evento: {event['tag']}")
         
-    except KeyboardInterrupt:
-        log_system("[TEST] Termination signal received.")
-
-    except Exception as e:
-        log_system(f"[TEST] Unhandled error: {e}", level="ERROR")
-
-    finally:
-        log_system("[TEST] Shutting down test...")
+        # Inseriamo l'evento nel sistema
+        # In base alla logica del tuo progetto, il dispatcher dovrebbe 
+        # notificare il manager o inserire l'evento in una coda
+        dispatcher.dispatch(event)
         
-        if actuator_manager:
-            actuator_manager.stop_all()
+        # Attendiamo che l'attuatore elabori l'evento
+        time.sleep(3) 
 
-        if dashboard:
-            unregister_dashboard_console()
-            dashboard.close()
-            
-        log_system("[TEST] Shutdown complete.")
+    print("\n--- Test completato. Controlla i log per i dettagli esecutivi. ---")
 
 if __name__ == "__main__":
-    main()
+    run_test()
