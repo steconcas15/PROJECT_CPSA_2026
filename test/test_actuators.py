@@ -37,6 +37,8 @@ with patch("bluepy.btle.Scanner") as mock_scanner, \
     MAC = "AA:BB:CC:DD:EE:FF"
 
     manager = ActuatorManager()
+    manager.scan_actuators()
+    manager.initialize_actuators()
     manager.actuators[f"meta_{MAC}"] = MetaMotionThread(MAC)
     manager.actuators[f"meta_{MAC}"].start()
     time.sleep(1)  # attesa connessione
