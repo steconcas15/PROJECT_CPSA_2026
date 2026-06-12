@@ -1,82 +1,70 @@
-# test_metamotion_simple.py
+# test_metamotion_real.py
 # Testa ActuatorManager + DrowsinessActivationPolicy + EventDispatcher + MetaMotionThread
-# usando eventi finti. Eseguire dalla root del progetto con: sudo python3 test_metamotion_simple.py
+# su HARDWARE REALE. Eseguire dalla root del progetto con: sudo python3 test_metamotion_real.py
+#
+# Prerequisiti:
+#   - MetaMotionRL acceso e nelle vicinanze (LED che lampeggia)
+#   - config.yaml con metamotion.enable: true
 
 import time
-import threading
-from unittest.mock import MagicMock, patch
 
-# ---- Mock BLE/MetaWear (rimuovere se si usa hardware reale) ----
-fake_device = MagicMock()
-fake_device.is_connected = True
-fake_device.board = MagicMock()
+from actuators.BLE.metamotion import scan_metamotion_devices, MetaMotionThread
+from actuation_policy import DrowsinessActivationPolicy
+from core.actuator_manager import ActuatorManager
+from utils.event_queue import get_event_queue, enqueue_drop_oldest
+from core.event_dispatcher import EventDispatcher
+from utils.logger import log_system
 
-vibration_log = []
-def fake_haptic(board, duty, duration):
-    vibration_log.append({"duty": duty, "duration": duration})
-    print(f"  🔴 [HW] vibrazione duty={duty}% duration={duration}ms")
+# ---- 1. Scansione dispositivo reale ----
+print("Scansione MetaMotion in corso (assicurati che sia acceso)...")
+mac_list = scan_metamotion_devices(timeout=5)
 
-with patch("bluepy.btle.Scanner") as mock_scanner, \
-     patch("mbientlab.metawear.MetaWear", return_value=fake_device), \
-     patch("mbientlab.metawear.libmetawear") as mock_lib, \
-     patch("mbientlab.warble.WarbleException", Exception):
+if not mac_list:
+    print("Nessun MetaMotion trovato. Controlla che sia acceso e nel raggio BLE.")
+    exit(1)
 
-    mock_scanner.return_value.scan.return_value = [
-        MagicMock(addr="AA:BB:CC:DD:EE:FF", getValueText=lambda x: "MetaWear")
-    ]
-    mock_lib.mbl_mw_haptic_start_motor.side_effect = fake_haptic
+MAC = mac_list[0]
+print(f"Trovato dispositivo: {MAC}")
 
+# ---- 2. Setup ActuatorManager ----
+manager = ActuatorManager()
+thread = MetaMotionThread(MAC)
+manager.actuators[f"meta_{MAC}"] = thread
+thread.start()
 
-    from actuators.BLE.metamotion import MetaMotionThread
-    from core.actuation_policy import DrowsinessActivationPolicy
-    from actuators.actuator_manager import ActuatorManager
-    from utils.event_queue import get_event_queue, enqueue_drop_oldest
-    from core.event_dispatcher import EventDispatcher
+print("Attesa connessione (la doppia vibrazione confirma la connessione)...")
+time.sleep(5)
 
-    # ---- Setup ----
-    MAC = "AA:BB:CC:DD:EE:FF"
+# ---- 3. Setup policy e dispatcher ----
+policy = DrowsinessActivationPolicy(actuator_ids=manager.get_actuators_ids())
+policy.max_vibration_attempts = 2
 
-    manager = ActuatorManager()
-    manager.scan_actuators()
-    manager.initialize_actuators()
-    manager.actuators[f"meta_{MAC}"] = MetaMotionThread(MAC)
-    manager.actuators[f"meta_{MAC}"].start()
-    time.sleep(1)  # attesa connessione
+dispatcher = EventDispatcher(actuator_manager=manager, policy=policy)
+dispatcher.start()
 
-    policy = DrowsinessActivationPolicy(actuator_ids=manager.get_actuators_ids())
-    policy.max_vibration_attempts = 2
+# ---- 4. Scenario eventi finti ----
+scenario = [
+    (0, "Sveglio — nessuna azione"),
+    (1, "Sospetto — nessuna azione"),
+    (2, "Confermato — vibrazione #1 (60%, 800ms)"),
+    (2, "Confermato — vibrazione #2 (80%, 1200ms)"),
+    (2, "Confermato — passa a speaker (nessuno speaker configurato, skip)"),
+    (0, "Sveglio — reset"),
+    (2, "Confermato dopo reset — vibrazione #1 di nuovo"),
+]
 
-    dispatcher = EventDispatcher(actuator_manager=manager, policy=policy)
-    dispatcher.start()
+q = get_event_queue()
+for tag, desc in scenario:
+    print(f"\n→ tag={tag} | {desc}")
+    enqueue_drop_oldest(q, {
+        "drowsiness_tag": tag,
+        "source": "test",
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+    })
+    time.sleep(2.5)  # tempo per sentire/vedere la vibrazione
 
-    # ---- Scenario eventi finti ----
-    scenario = [
-        (0, "Sveglio — nessuna azione"),
-        (1, "Sospetto — nessuna azione"),
-        (2, "Confermato — vibrazione #1"),
-        (2, "Confermato — vibrazione #2"),
-        (2, "Confermato — passa a speaker (nessuno speaker, skip)"),
-        (0, "Sveglio — reset"),
-        (2, "Confermato dopo reset — vibrazione #1 di nuovo"),
-    ]
-
-    q = get_event_queue()
-    for tag, desc in scenario:
-        print(f"\n→ tag={tag} | {desc}")
-        enqueue_drop_oldest(q, {
-            "drowsiness_tag": tag,
-            "source": "test",
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
-        })
-        time.sleep(1.5)
-
-    # ---- Stop ----
-    dispatcher.stop()
-    manager.stop_all()
-
-    # ---- Riepilogo ----
-    print(f"\n{'─'*50}")
-    print(f"Vibrazioni inviate all'HW: {len(vibration_log)}")
-    for i, v in enumerate(vibration_log, 1):
-        print(f"  [{i}] duty={v['duty']}%, duration={v['duration']}ms")
-    print("Test completato.")
+# ---- 5. Stop ----
+print("\nArresto in corso...")
+dispatcher.stop()
+manager.stop_all()
+print("Test completato.")
