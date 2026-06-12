@@ -7,10 +7,11 @@
 #   - config.yaml con metamotion.enable: true
 
 import time
+import threading
 
 from actuators.BLE.metamotion import scan_metamotion_devices, MetaMotionThread
-from actuation_policy import DrowsinessActivationPolicy
-from core.actuator_manager import ActuatorManager
+from core.actuation_policy import DrowsinessActivationPolicy
+from actuators.actuator_manager import ActuatorManager
 from utils.event_queue import get_event_queue, enqueue_drop_oldest
 from core.event_dispatcher import EventDispatcher
 from utils.logger import log_system
