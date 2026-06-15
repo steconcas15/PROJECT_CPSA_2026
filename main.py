@@ -1,7 +1,7 @@
 # test_yolo.py
 import time
 
-from Video_Pipeline.Yolo_v3u.yolo_v3u_thread import YoloDpuThread
+from Video_Pipeline.Yolo_v3.yolo_v3_thread import YoloDpuThread
 from Video_Pipeline.shared.person_roi_state import PersonRoiState
 
 from utils.logger import log_system
