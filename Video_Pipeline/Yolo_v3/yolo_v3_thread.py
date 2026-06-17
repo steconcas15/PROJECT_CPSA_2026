@@ -521,5 +521,3 @@ class YoloDpuThread(threading.Thread):
 
         if self.is_alive():
             self.join(timeout=3.0)
-
-```
