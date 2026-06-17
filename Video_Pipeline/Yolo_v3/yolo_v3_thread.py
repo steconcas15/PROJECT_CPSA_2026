@@ -177,10 +177,10 @@ def postprocess(output, frame, conf_threshold=0.6, nms_threshold=0.4):
                         best_person_conf = conf
                         best_person_bbox = (fb_x1, y1, fb_x2, y_head_shoulders)
 
-                    cv2.rectangle(frame, (fb_x1, y1), (fb_x2, y_head_shoulders), (0, 255, 255), 2)
+                    cv2.rectangle(frame, (fb_x1, y1), (fb_x2, y_head_shoulders), (0, 255, 0), 2)
                     cv2.putText(
                         frame,
-                        f"{label} {conf:.2f}",
+                        f"Face {conf:.2f}",
                         (fb_x1, max(0, y1 - 5)),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.5,
