@@ -1,8 +1,3 @@
-Ecco il codice completo aggiornato con la matematica corretta per il tuo modello reale (**griglia 20x20, input 640x640, classe "face"**).
-
-Ho mantenuto intatta la logica dei calcoli e ho riscritto tutti i docstring e i blocchi di commenti passo-passo (incluso l'esempio numerico dettagliato ricalcolato per la griglia 20x20) seguendo esattamente lo stile, la formattazione e la struttura didattica che mi hai fornito come modello.
-
-```python
 # CPSA2026/VIDEO_Pipeline/Yolo_v3/yolo_v3_thread.py
 
 import cv2
