@@ -73,6 +73,9 @@ def main():
         if yolo_thread:
             yolo_thread.stop()
 
+        if resnet_thread:               # 18_06_2026
+            resnet_thread.stop()        # 18_06_2026
+            
         if dashboard:
             unregister_dashboard_console()
             dashboard.close()
