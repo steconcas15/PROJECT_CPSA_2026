@@ -1,27 +1,34 @@
+# main.py
+# Realtime Core Executive Layer for Drowsiness Detection Pipeline
+#
+# Author: Francesco Urru (Adapted for Drowsiness Core)
+# Repository: https://github.com/frarvo/CPSA_2026
+# License: MIT
+
 import time
 
+# Core hardware video (YOLOv3 DPU) e gestione ROI
 from Video_Pipeline.Yolo_v3.yolo_v3_thread import YoloDpuThread
 from Video_Pipeline.shared.person_roi_state import PersonRoiState
 
-# 1. IMPORTA I MODULI REALI CORRETTI
-from IMU_pipeline.classifiers.drowsiness_classifier import DrowsinessClassifier
-from IMU_pipeline.policies.actuation_policy import StereotipyActivationPolicy
+# Core logico (Dispatcher e Policy reale degli stimoli)
 from core.event_dispatcher import EventDispatcher
+from IMU_pipeline.policies.actuation_policy import StereotipyActivationPolicy
 
+# Core classificazione algoritmica e gestione sensori IMU BlueCoin
+from IMU_pipeline.classifiers.drowsiness_classifier import DrowsinessClassifier
 from sensors.sensor_manager import SensorManager
+
+# Moduli di sistema centralizzati del Framework CPSA
+from utils.actuator_manager import get_actuator_manager  
 from utils.logger import log_system
 from utils.config import get_bluecoin_config
-
 from utils.video_dashboard import (
     VideoDashboard,
     register_dashboard_console,
     unregister_dashboard_console,
 )
 
-# Rimane momentaneo solo il manager degli attuatori fisici se non lo hai ancora centralizzato
-class MockActuatorManager:
-    def trigger(self, actuator_id, action_type, **kwargs):
-        log_system(f"[MOCK ACTUATOR] 🚨 ATTIVAZIONE FISICA: {actuator_id} -> {kwargs}")
 
 def main():
     sensor_manager = None
@@ -30,103 +37,97 @@ def main():
     dispatcher = None
 
     try:
-        # Inizializza la Dashboard grafica (la finestra OpenCV)
+        # 1. Inizializzazione Interfaccia Grafica (Dashboard OpenCV su schermo)
         dashboard = VideoDashboard(
-            window_name="CPSA Dashboard - YOLO TRIGGER TEST",
+            window_name="CPSA 2026 - Drowsiness Detection System",
             fullscreen=False
         )
         register_dashboard_console(dashboard)
 
-        log_system("[TEST] Initializing sensors and YOLO test system...")
+        log_system("[MAIN] Inizializzazione del SensorManager...")
         sensor_manager = SensorManager()
 
-        # ── EVENTO CORREZIONE 1: AGGANCIA IL VERO CLASSIFICATORE AL MANAGER ──
-        # Se non fai questo, il SensorManager userà il vecchio classificatore di stereotipie!
+        # 2. Configurazione del VERO DrowsinessClassifier all'interno del manager delle IMU
         sensor_manager.classifier = DrowsinessClassifier()
         sensor_manager.synchronizer.buffer.set_features_sink(sensor_manager.classifier.recognize)
 
+        # 3. Scansione BLE e controllo presenza dei sensori BlueCoin configurati
         sensor_manager.scan_sensors()
-
         expected_names = {
-            entry.get("name")
-            for entry in get_bluecoin_config()
-            if entry.get("name")
+            entry.get("name") for entry in get_bluecoin_config() if entry.get("name")
         }
 
         if expected_names:
             max_sensor_retries = 5
-            retry_delay_sec = 5
+            retry_delay_sec = 3
             attempt = 0
 
-            def actual_sensors():
-                return set(sensor_manager.get_sensors_names())
-
-            while not expected_names.issubset(actual_sensors()) and attempt < max_sensor_retries:
+            while not expected_names.issubset(set(sensor_manager.get_sensors_names())) and attempt < max_sensor_retries:
                 attempt += 1
-                log_system(f"[MAIN] Missing expected sensors. Retry {attempt}/{max_sensor_retries} in {retry_delay_sec}s...")
+                log_system(f"[MAIN] Sensori BlueCoin attesi non trovati. Tentativo {attempt}/{max_sensor_retries}...")
                 time.sleep(retry_delay_sec)
                 sensor_manager.scan_sensors()
 
-            if not expected_names.issubset(actual_sensors()):
-                log_system("[MAIN] Critical: Target BlueCoin sensors not found. Exiting.", level="ERROR")
+            if not expected_names.issubset(set(sensor_manager.get_sensors_names())):
+                log_system("[MAIN] Errore Critico: Hardware BlueCoin non rilevato. Uscita dal sistema.", level="ERROR")
                 return
 
-        # Avvo dei thread di ricezione dati dei sensori BlueCoin
+        # 4. Avvio del Sensing Layer (I sensori iniziano a trasmettere pacchetti via BLE)
         sensor_manager.initialize_sensors()
-
-        log_system("[MAIN] IMU Pipeline and Drowsiness Classifier are now fully running.")
+        log_system("[MAIN] Pipeline IMU e modulo di filtraggio complementare online.")
         
-        # Crea la struttura ROI di cui YOLO ha bisogno per memorizzare i dati
+        # 5. Inizializzazione dello stato ROI e avvio del thread hardware YOLOv3 sulla DPU
         roi_state = PersonRoiState()
+        yolo_thread = YoloDpuThread(roi_state=roi_state, camera_index=0)
+        yolo_thread.start() # Il thread parte in standby ('idle'), la telecamera fisica rimane spenta
 
-        # Istanzia il thread di YOLO passandogli la ROI
-        yolo_thread = YoloDpuThread(roi_state=roi_state)
-        yolo_thread.start()
+        # 6. Configurazione della Policy reale per l'attivazione dei dispositivi di allarme
+        # Inserisci gli ID precisi dei tuoi attuatori hardware (es. led cruscotto, buzzer, speaker)
+        attuatori_sistema = ["led_cruscotto", "speaker_allarme"]
+        drowsiness_policy = StereotipyActivationPolicy(actuator_ids=attuatori_sistema)
 
-        log_system("[TEST] YOLO System is running.")
-        
-        # ── EVENTO CORREZIONE 2: ISTANZIA LA VERA POLICY CON IL METODO HANDLE ──
-        # Specifichiamo gli attuatori da usare. Questa classe ha il metodo .handle() richiesto!
-        attuatori_selezionati = ["led_cruscotto", "speaker_allarme"]
-        drowsiness_policy = StereotipyActivationPolicy(actuator_ids=attuatori_selezionati)
-
-        # Istanzia l'EventDispatcher passando i moduli corretti
+        # 7. Avvio del Direttore d'Orchestra (EventDispatcher)
+        # Sincronizza i dati estratti dalle IMU con l'accensione della telecamera e degli stimoli hardware
         dispatcher = EventDispatcher(
-            actuator_manager=MockActuatorManager(),
-            policy=drowsiness_policy, # <── Adesso passiamo l'oggetto reale e funzionante
+            actuator_manager=get_actuator_manager(),
+            policy=drowsiness_policy,
             yolo_thread=yolo_thread,
-            movenet_thread=None,
+            movenet_thread=None,  # Configurato a None in questa fase di test YOLO
             roi_state=roi_state
         )
         dispatcher.start()
 
-        log_system("[TEST] System connected via EventDispatcher. Waiting for IMU triggers...")
+        log_system("[MAIN] Sistema di controllo ad eventi attivo. In attesa di segnali dai sensori...")
 
-        # Loop principale: rendering grafico continuo
+        # 8. Loop principale di esecuzione: Aggiornamento Dashboard grafica a schermo
         while True:
+            # Renderizza lo stato corrente (Mostra lo standby se il guidatore è sveglio, 
+            # mostra il feed video in real-time se si attiva YOLO in seguito a un evento)
             dashboard.render(yolo_thread, None)
 
+            # Cattura la chiusura del software tramite la pressione del tasto 'q' sulla finestra
             key = dashboard.wait_key(1)
             if key == ord("q"):
-                log_system("[TEST] Quit requested via keyboard.")
+                log_system("[MAIN] Richiesta di chiusura intercettata da tastiera.")
                 break
 
             time.sleep(0.01)
 
     except KeyboardInterrupt:
-        log_system("[TEST] Termination signal received.")
-
+        log_system("[MAIN] Interruzione manuale del sistema rilevata (Ctrl+C).")
     except Exception as e:
         import traceback
-        log_system(f"[TEST] Unhandled error:", level="ERROR")
+        log_system("="*50, level="ERROR")
+        log_system(f"[CRITICAL ERROR] Fallimento bloccante nel ciclo executive principale:", level="ERROR")
         log_system(traceback.format_exc(), level="ERROR")
-
+        log_system("="*50, level="ERROR")
     finally:
-        log_system("[TEST] Shutting down YOLO test...")
+        # 9. Pipeline di spegnimento sicuro e rilascio controllato di tutte le risorse
+        log_system("[MAIN] Avvio procedure di arresto hardware e software in corso...")
         
         if dispatcher:
             dispatcher.stop()
-        
+
         if sensor_manager:
             sensor_manager.stop_all()
 
@@ -137,7 +138,8 @@ def main():
             unregister_dashboard_console()
             dashboard.close()
             
-        log_system("[TEST] Shutdown complete.")
+        log_system("[MAIN] Tutti i moduli sono stati spenti correttamente. Risorse hardware rilasciate.")
+
 
 if __name__ == "__main__":
     main()
