@@ -140,6 +140,11 @@ class EventDispatcher:
         if not self.yolo_thread.is_active():
             log_system(f"[Dispatcher] Activating YOLO. stage={stage}", level="INFO")
             self.yolo_thread.activate()
+            start_wait = time.monotonic()
+            while self.yolo_thread.phase != "running" and (time.monotonic() - start_wait) < 2.0:
+                time.sleep(0.1)
+
+            log_system(f"[Dispatcher] Telecamera hardware agganciata. Stato YOLO: {self.yolo_thread.phase}")
 
         self._video_stage = stage
 
