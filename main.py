@@ -4,6 +4,8 @@ import time
 from Video_Pipeline.Yolo_v3.yolo_v3_thread import YoloDpuThread
 from Video_Pipeline.shared.person_roi_state import PersonRoiState
 
+from Video_Pipeline.Resnet18.resnet18_thread import ResNetDpuThread  # 18_06_2026
+
 from utils.logger import log_system
 # Nota: verifica che all'interno di utils ci sia effettivamente il file video_dashboard.py. 
 # Se nello screenshot non si vede perché la cartella è contratta, l'import corretto è questo:
@@ -33,18 +35,23 @@ def main():
         # Istanzia il thread di YOLO passandogli la ROI
         yolo_thread = YoloDpuThread(roi_state=roi_state)
 
+        resnet_thread = ResNetDpuThread(roi_state=roi_state, debug_window=False) # 18_06_2026
+
         # Avvia il thread (il motore asincrono si accende in background)
         yolo_thread.start()
         
         # Sveglia il thread dallo stato 'idle' per forzare l'apertura della cam
         yolo_thread.activate()
 
+        resnet_thread.start()     # 18_06_2026
+        resnet_thread.activate()  # 18_06_2026
+
         log_system("[TEST] YOLO System is running. Press 'q' inside the window to exit.")
 
         # Loop principale: rendering grafico continuo
         while True:
             # Passiamo 'None' al posto di movenet_thread così la dashboard disegna solo YOLO
-            dashboard.render(yolo_thread, None)
+            dashboard.render(yolo_thread, resnet_thread) # 18_06_2026 Prima c'era None
 
             # Ascolta la tastiera per catturare la chiusura
             key = dashboard.wait_key(1)
