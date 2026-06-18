@@ -46,10 +46,10 @@ class VideoDashboard:
         self.yolo_panel_w = self.width // 2
         self.yolo_panel_h = self.top_h
 
-        self.movenet_panel_x = self.width // 2
-        self.movenet_panel_y = 0
-        self.movenet_panel_w = self.width // 2
-        self.movenet_panel_h = self.top_h
+        self.resnet_panel_x = self.width // 2
+        self.resnet_panel_y = 0
+        self.resnet_panel_w = self.width // 2
+        self.resnet_panel_h = self.top_h
 
         self.console_lines = deque(maxlen=console_max_lines)
 
@@ -159,7 +159,7 @@ class VideoDashboard:
             )
             y += 22
 
-    def render(self, yolo_thread=None, movenet_thread=None):
+    def render(self, yolo_thread=None, resnet_thread=None):
         dashboard = np.zeros((self.height, self.width, 3), dtype=np.uint8)
 
         yolo_frame = self.get_thread_frame(
@@ -168,10 +168,10 @@ class VideoDashboard:
             self.yolo_panel_h,
         )
 
-        movenet_frame = self.get_thread_frame(
-            movenet_thread,
-            self.movenet_panel_w,
-            self.movenet_panel_h,
+        resnet_frame = self.get_thread_frame(
+            resnet_thread,
+            self.resnet_panel_w,
+            self.resnet_panel_h,
         )
 
         dashboard[
@@ -180,12 +180,12 @@ class VideoDashboard:
         ] = yolo_frame
 
         dashboard[
-            self.movenet_panel_y:self.movenet_panel_y + self.movenet_panel_h,
-            self.movenet_panel_x:self.movenet_panel_x + self.movenet_panel_w,
+            self.resnet_panel_y:self.resnet_panel_y + self.resnet_panel_h,
+            self.resnet_panel_x:self.resnet_panel_x + self.resnet_panel_w,
         ] = movenet_frame
 
         yolo_active = yolo_thread.is_active() if yolo_thread else False
-        movenet_active = movenet_thread.is_active() if movenet_thread else False
+        resnet_active = resnet_thread.is_active() if resnet_thread else False
 
         self.draw_panel_title(
             dashboard,
@@ -198,11 +198,11 @@ class VideoDashboard:
 
         self.draw_panel_title(
             dashboard,
-            "MoveNet DPU",
-            self.movenet_panel_x,
-            self.movenet_panel_y,
-            movenet_active,
-            self.get_phase(movenet_thread),
+            "ResNet DPU",
+            self.resnet_panel_x,
+            self.resnet_panel_y,
+            resnet_active,
+            self.get_phase(resnet_thread),
         )
 
         cv2.line(
