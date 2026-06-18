@@ -5,6 +5,8 @@ import xir
 import threading
 import time
 
+from utils.config import get_resnet_path
+
 ROI_MAX_AGE_SEC = 1.0
 
 # Margini di espansione per il ritaglio (nel tuo script Colab usi il 30%, quindi impostiamo 0.30)
@@ -138,9 +140,10 @@ def preprocess_for_resnet(frame, input_shape, input_tensor, roi_bbox=None):
 
 class ResNetDpuThread(threading.Thread):
 
-    def __init__(self, model_path: str, camera_index: int = 0, debug_window: bool = False, roi_state=None):
+    def __init__(self, camera_index: int = 0, debug_window: bool = False, roi_state=None):
         super().__init__(daemon=True)
-        self.model_path = model_path
+        # Il path viene preso direttamente dalla configurazione
+        self.model_path = get_resnet_path() 
         self.camera_index = camera_index
         self.debug_window = debug_window
         self.roi_state = roi_state
@@ -158,26 +161,7 @@ class ResNetDpuThread(threading.Thread):
         self.latest_frame = None
         self.phase = "idle"
 
-    def activate(self):
-        self.active_event.set()
-
-    def deactivate(self):
-        self.active_event.clear()
-        with self.result_lock:
-            self.latest_prediction = "UNKNOWN"
-            self.latest_confidence = 0.0
-            self.latest_result_ts = None
-            self.latest_frame = None
-
-    def get_latest_status(self):
-        with self.result_lock:
-            return self.latest_prediction, self.latest_confidence, self.latest_frame, self.latest_result_ts
-
-    def stop(self):
-        self.stop_event.set()
-        self.active_event.set()
-        if self.is_alive():
-            self.join(timeout=3.0)
+    # ... [MANTENERE INVARIATE: activate, deactivate, get_latest_status, stop] ...
 
     def run(self):
         try:
@@ -207,17 +191,12 @@ class ResNetDpuThread(threading.Thread):
                 self.phase = "opening_camera"
                 self.cap = cv2.VideoCapture(self.camera_index)
                 if not self.cap.isOpened():
-                    print("[ResNetDpuThread] Errore: Webcam non trovata")
                     self.active_event.clear()
                     self.phase = "idle"
                     continue
 
                 self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                 self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-
-                if self.debug_window:
-                    cv2.namedWindow("ResNet DPU Classification", cv2.WINDOW_NORMAL)
-                    cv2.resizeWindow("ResNet DPU Classification", display_w, display_h)
 
                 output_data = [
                     np.empty(tuple(ot.dims), dtype=np.int8 if get_fix_point(ot) is not None else np.float32)
@@ -228,27 +207,15 @@ class ResNetDpuThread(threading.Thread):
 
                 while self.active_event.is_set() and not self.stop_event.is_set():
                     ret, frame = self.cap.read()
-                    if not ret:
-                        print("[ResNetDpuThread] Errore di lettura del frame")
-                        break
-
+                    if not ret: break
                     frame = cv2.flip(frame, 1)
 
-                    # Recupero della ROI passata dall'altro thread (YOLO)
-                    roi_bbox = None
-                    if self.roi_state is not None:
-                        roi_bbox = self.roi_state.get_valid_roi(max_age_sec=ROI_MAX_AGE_SEC)
+                    roi_bbox = self.roi_state.get_valid_roi(max_age_sec=ROI_MAX_AGE_SEC) if self.roi_state else None
+                    img_input, crop_view, transform = preprocess_for_resnet(frame, input_shape, input_tensor, roi_bbox=roi_bbox)
 
-                    # Preprocessamento con allineamento alla scala di grigi del Colab
-                    img_input, crop_view, transform = preprocess_for_resnet(
-                        frame, input_shape, input_tensor, roi_bbox=roi_bbox
-                    )
-
-                    # Inferenza hardware
                     job_id = self.runner.execute_async([img_input], output_data)
                     self.runner.wait(job_id)
 
-                    # Softmax software per ricavare la confidenza
                     logits = dequantize(output_data[0], output_tensors[0])[0]
                     exp_logits = np.exp(logits - np.max(logits))
                     probabilities = exp_logits / np.sum(exp_logits)
@@ -257,50 +224,37 @@ class ResNetDpuThread(threading.Thread):
                     prediction_name = CLASS_NAMES[pred_class_id]
                     confidence = probabilities[pred_class_id]
 
-                    # --- AGGIORNAMENTO GRAFICO (DEBUG COERENTE CON COLAB) ---
+                    # --- AGGIORNAMENTO GRAFICO CON COLORI DINAMICI ---
                     debug_view = frame.copy()
                     
-                    # Disegnamo il rettangolo del ritaglio
-                    cv2.rectangle(
-                        debug_view, 
-                        (transform["crop_x1"], transform["crop_y1"]), 
-                        (transform["crop_x2"], transform["crop_y2"]), 
-                        (0, 255, 0), 2
-                    )
+                    # Colore dinamico: Rosso se DROWSY, Verde se NATURAL
+                    color = (0, 0, 255) if prediction_name == "DROWSY" else (0, 255, 0)
                     
-                    text_color = (0, 0, 255) if prediction_name == "DROWSY" else (0, 255, 0)
+                    # Disegna la box
+                    x1, y1 = transform["crop_x1"], transform["crop_y1"]
+                    x2, y2 = transform["crop_x2"], transform["crop_y2"]
+                    cv2.rectangle(debug_view, (x1, y1), (x2, y2), color, 3)
                     
-                    cv2.putText(
-                        debug_view, f"STATO: {prediction_name} ({confidence*100:.1f}%)", 
-                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, text_color, 2
-                    )
+                    # Disegna la scritta
+                    label = f"{prediction_name} {confidence*100:.1f}%"
+                    cv2.putText(debug_view, label, (x1, max(y1 - 10, 20)), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
 
                     now = time.monotonic()
                     with self.result_lock:
                         self.latest_prediction = prediction_name
                         self.latest_confidence = float(confidence)
                         self.latest_result_ts = now
-                        self.latest_frame = debug_view.copy()
+                        self.latest_frame = debug_view.copy() # Frame con grafica
 
                     if self.debug_window:
                         cv2.imshow("ResNet DPU Classification", debug_view)
                         if cv2.waitKey(1) & 0xFF == ord("q"):
-                            self.deactivate()
-                            break
+                            self.deactivate(); break
 
-                self.phase = "closing_camera"
-                if self.cap:
-                    self.cap.release()
-                    self.cap = None
-
-                if self.debug_window:
-                    try: cv2.destroyWindow("ResNet DPU Classification")
-                    except cv2.error: pass
-
+                if self.cap: self.cap.release(); self.cap = None
                 self.phase = "idle"
-
         finally:
-            if self.cap:
-                self.cap.release()
+            if self.cap: self.cap.release()
             self.runner = None
             self.phase = "stopped"
