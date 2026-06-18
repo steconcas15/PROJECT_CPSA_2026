@@ -148,7 +148,7 @@ class EventDispatcher:
 
         self._video_stage = stage
 
-        if stage == "yolo_tag2" and previous_stage != "yolo_tag2":
+        if stage == "yolo_tag2" and (previous_stage != "yolo_tag2" or self._yolo_tag2_started_ts is None):
             self._yolo_tag2_started_ts = time.monotonic()
 
     def _activate_movenet(self, stage):
