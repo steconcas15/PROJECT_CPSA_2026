@@ -7,7 +7,7 @@ YOLO_SMOOTH_ALPHA = 0.85
 
 class PersonRoiState:
     """
-    Thread-safe shared person ROI state.
+    Thread-safe shared person ROI (Region of Interest) state.
 
     Coordinates are always full-frame xyxy:
         (x1, y1, x2, y2)
