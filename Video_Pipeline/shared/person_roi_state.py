@@ -19,6 +19,7 @@ class PersonRoiState:
     """
 
     def __init__(self):
+        #Prevents any other thread from writing while we are reading information from YOLO
         self._lock = threading.Lock()
 
         # Latest raw bbox received from YOLO.
