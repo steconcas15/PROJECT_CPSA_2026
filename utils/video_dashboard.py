@@ -182,7 +182,7 @@ class VideoDashboard:
         dashboard[
             self.resnet_panel_y:self.resnet_panel_y + self.resnet_panel_h,
             self.resnet_panel_x:self.resnet_panel_x + self.resnet_panel_w,
-        ] = movenet_frame
+        ] = resnet_frame
 
         yolo_active = yolo_thread.is_active() if yolo_thread else False
         resnet_active = resnet_thread.is_active() if resnet_thread else False
