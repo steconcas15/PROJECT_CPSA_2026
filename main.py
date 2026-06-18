@@ -13,7 +13,7 @@ from Video_Pipeline.shared.person_roi_state import PersonRoiState
 
 # Core logico (Dispatcher e Policy reale degli stimoli)
 from core.event_dispatcher import EventDispatcher
-from IMU_pipeline.policies.actuation_policy import StereotipyActivationPolicy
+from core.actuation_policy import DrowsinessActivationPolicy
 
 # Core classificazione algoritmica e gestione sensori IMU BlueCoin
 from IMU_pipeline.classifiers.drowsiness_classifier import DrowsinessClassifier
@@ -84,7 +84,7 @@ def main():
         # 6. Configurazione della Policy reale per l'attivazione dei dispositivi di allarme
         # Inserisci gli ID precisi dei tuoi attuatori hardware (es. led cruscotto, buzzer, speaker)
         attuatori_sistema = ["led_cruscotto", "speaker_allarme"]
-        drowsiness_policy = StereotipyActivationPolicy(actuator_ids=attuatori_sistema)
+        drowsiness_policy = DrowsinessActivationPolicy(actuator_ids=attuatori_sistema)
 
         # 7. Avvio del Direttore d'Orchestra (EventDispatcher)
         # Sincronizza i dati estratti dalle IMU con l'accensione della telecamera e degli stimoli hardware
