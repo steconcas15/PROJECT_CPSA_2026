@@ -1,39 +1,24 @@
-# test_yolo.py
 import time
 
 from Video_Pipeline.Yolo_v3.yolo_v3_thread import YoloDpuThread
 from Video_Pipeline.shared.person_roi_state import PersonRoiState
 
+# 1. IMPORTA I MODULI REALI CORRETTI
+from IMU_pipeline.classifiers.drowsiness_classifier import DrowsinessClassifier
 from IMU_pipeline.policies.actuation_policy import StereotipyActivationPolicy
-from IMU_pipeline.dispatchers.event_dispatcher import EventDispatcher
+from core.event_dispatcher import EventDispatcher
 
-from sensors import sensor_manager
 from sensors.sensor_manager import SensorManager
 from utils.logger import log_system
 from utils.config import get_bluecoin_config
 
-from utils.logger import log_system
-# Nota: verifica che all'interno di utils ci sia effettivamente il file video_dashboard.py. 
-# Se nello screenshot non si vede perché la cartella è contratta, l'import corretto è questo:
 from utils.video_dashboard import (
     VideoDashboard,
     register_dashboard_console,
     unregister_dashboard_console,
 )
 
-# Classi momentanee per testare il funzionamento della fotocamera
-# In test_yolo.py
-
-# Sostituisci la vecchia classe MockPolicy con questa che simula una risposta corretta
-class MockDrowsinessPolicy:
-    def __init__(self):
-        # Usiamo la classe reale per generare i parametri corretti per i LED/Speaker
-        self.real_policy = StereotipyActivationPolicy(actuator_ids=["led_cruscotto", "speaker_allarme"])
-
-    def handle(self, event):
-        # Delega alla policy reale per non restituire None in caso di sonnolenza
-        return self.real_policy.handle(event)
-
+# Rimane momentaneo solo il manager degli attuatori fisici se non lo hai ancora centralizzato
 class MockActuatorManager:
     def trigger(self, actuator_id, action_type, **kwargs):
         log_system(f"[MOCK ACTUATOR] 🚨 ATTIVAZIONE FISICA: {actuator_id} -> {kwargs}")
@@ -42,17 +27,23 @@ def main():
     sensor_manager = None
     dashboard = None
     yolo_thread = None
+    dispatcher = None
 
     try:
         # Inizializza la Dashboard grafica (la finestra OpenCV)
         dashboard = VideoDashboard(
-            window_name="CPSA Dashboard - SOLO YOLO TEST",
+            window_name="CPSA Dashboard - YOLO TRIGGER TEST",
             fullscreen=False
         )
         register_dashboard_console(dashboard)
 
-        log_system("[TEST] Initializing sensors and minimal YOLO test system...")
+        log_system("[TEST] Initializing sensors and YOLO test system...")
         sensor_manager = SensorManager()
+
+        # ── EVENTO CORREZIONE 1: AGGANCIA IL VERO CLASSIFICATORE AL MANAGER ──
+        # Se non fai questo, il SensorManager userà il vecchio classificatore di stereotipie!
+        sensor_manager.classifier = DrowsinessClassifier()
+        sensor_manager.synchronizer.buffer.set_features_sink(sensor_manager.classifier.recognize)
 
         sensor_manager.scan_sensors()
 
@@ -80,29 +71,29 @@ def main():
                 log_system("[MAIN] Critical: Target BlueCoin sensors not found. Exiting.", level="ERROR")
                 return
 
-        # 3. Avvio dei thread di ricezione dati (Sensing Layer)
+        # Avvo dei thread di ricezione dati dei sensori BlueCoin
         sensor_manager.initialize_sensors()
 
         log_system("[MAIN] IMU Pipeline and Drowsiness Classifier are now fully running.")
-        log_system("[MAIN] Monitoring streaming data... Press Ctrl+C to stop.")
         
         # Crea la struttura ROI di cui YOLO ha bisogno per memorizzare i dati
         roi_state = PersonRoiState()
 
         # Istanzia il thread di YOLO passandogli la ROI
         yolo_thread = YoloDpuThread(roi_state=roi_state)
-
-        # Avvia il thread (il motore asincrono si accende in background)
         yolo_thread.start()
 
-        log_system("[TEST] YOLO System is running. Press 'q' inside the window to exit.")
+        log_system("[TEST] YOLO System is running.")
         
-        # Istanzia il nuovo gestore policy aggiornato
-        drowsiness_policy = MockDrowsinessPolicy()
+        # ── EVENTO CORREZIONE 2: ISTANZIA LA VERA POLICY CON IL METODO HANDLE ──
+        # Specifichiamo gli attuatori da usare. Questa classe ha il metodo .handle() richiesto!
+        attuatori_selezionati = ["led_cruscotto", "speaker_allarme"]
+        drowsiness_policy = StereotipyActivationPolicy(actuator_ids=attuatori_selezionati)
 
+        # Istanzia l'EventDispatcher passando i moduli corretti
         dispatcher = EventDispatcher(
             actuator_manager=MockActuatorManager(),
-            policy=drowsiness_policy, # <── Passiamo la policy funzionante
+            policy=drowsiness_policy, # <── Adesso passiamo l'oggetto reale e funzionante
             yolo_thread=yolo_thread,
             movenet_thread=None,
             roi_state=roi_state
@@ -111,14 +102,10 @@ def main():
 
         log_system("[TEST] System connected via EventDispatcher. Waiting for IMU triggers...")
 
-        
-
         # Loop principale: rendering grafico continuo
         while True:
-            # Passiamo 'None' al posto di movenet_thread così la dashboard disegna solo YOLO
             dashboard.render(yolo_thread, None)
 
-            # Ascolta la tastiera per catturare la chiusura
             key = dashboard.wait_key(1)
             if key == ord("q"):
                 log_system("[TEST] Quit requested via keyboard.")
@@ -130,10 +117,15 @@ def main():
         log_system("[TEST] Termination signal received.")
 
     except Exception as e:
-        log_system(f"[TEST] Unhandled error: {e}", level="ERROR")
+        import traceback
+        log_system(f"[TEST] Unhandled error:", level="ERROR")
+        log_system(traceback.format_exc(), level="ERROR")
 
     finally:
         log_system("[TEST] Shutting down YOLO test...")
+        
+        if dispatcher:
+            dispatcher.stop()
         
         if sensor_manager:
             sensor_manager.stop_all()
