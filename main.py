@@ -22,10 +22,21 @@ from utils.video_dashboard import (
 )
 
 # Classi momentanee per testare il funzionamento della fotocamera
-class MockPolicy:
-    def handle(self, event): return None
+# In test_yolo.py
+
+# Sostituisci la vecchia classe MockPolicy con questa che simula una risposta corretta
+class MockDrowsinessPolicy:
+    def __init__(self):
+        # Usiamo la classe reale per generare i parametri corretti per i LED/Speaker
+        self.real_policy = StereotipyActivationPolicy(actuator_ids=["led_cruscotto", "speaker_allarme"])
+
+    def handle(self, event):
+        # Delega alla policy reale per non restituire None in caso di sonnolenza
+        return self.real_policy.handle(event)
+
 class MockActuatorManager:
-    def trigger(self, *args, **kwargs): pass
+    def trigger(self, actuator_id, action_type, **kwargs):
+        log_system(f"[MOCK ACTUATOR] 🚨 ATTIVAZIONE FISICA: {actuator_id} -> {kwargs}")
 
 def main():
     sensor_manager = None
@@ -86,11 +97,14 @@ def main():
 
         log_system("[TEST] YOLO System is running. Press 'q' inside the window to exit.")
         
+        # Istanzia il nuovo gestore policy aggiornato
+        drowsiness_policy = MockDrowsinessPolicy()
+
         dispatcher = EventDispatcher(
             actuator_manager=MockActuatorManager(),
-            policy=MockPolicy(),
+            policy=drowsiness_policy, # <── Passiamo la policy funzionante
             yolo_thread=yolo_thread,
-            movenet_thread=None, # In questo test usiamo solo YOLO
+            movenet_thread=None,
             roi_state=roi_state
         )
         dispatcher.start()
