@@ -4,9 +4,6 @@ import time
 from Video_Pipeline.Yolo_v3.yolo_v3_thread import YoloDpuThread
 from Video_Pipeline.shared.person_roi_state import PersonRoiState
 
-from IMU_pipeline.policies.actuation_policy import StereotipyActivationPolicy
-from IMU_pipeline.dispatchers.event_dispatcher import EventDispatcher
-
 from sensors import sensor_manager
 from sensors.sensor_manager import SensorManager
 from utils.logger import log_system
@@ -20,12 +17,6 @@ from utils.video_dashboard import (
     register_dashboard_console,
     unregister_dashboard_console,
 )
-
-# Classi momentanee per testare il funzionamento della fotocamera
-class MockPolicy:
-    def handle(self, event): return None
-class MockActuatorManager:
-    def trigger(self, *args, **kwargs): pass
 
 def main():
     sensor_manager = None
@@ -83,21 +74,11 @@ def main():
 
         # Avvia il thread (il motore asincrono si accende in background)
         yolo_thread.start()
+        
+        # Sveglia il thread dallo stato 'idle' per forzare l'apertura della cam
+        yolo_thread.activate()
 
         log_system("[TEST] YOLO System is running. Press 'q' inside the window to exit.")
-        
-        dispatcher = EventDispatcher(
-            actuator_manager=MockActuatorManager(),
-            policy=MockPolicy(),
-            yolo_thread=yolo_thread,
-            movenet_thread=None, # In questo test usiamo solo YOLO
-            roi_state=roi_state
-        )
-        dispatcher.start()
-
-        log_system("[TEST] System connected via EventDispatcher. Waiting for IMU triggers...")
-
-        
 
         # Loop principale: rendering grafico continuo
         while True:
