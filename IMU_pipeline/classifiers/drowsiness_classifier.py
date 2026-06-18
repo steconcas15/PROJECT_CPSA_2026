@@ -154,7 +154,7 @@ class DrowsinessClassifier:
                 if self.event_queue is not None:
                     try:
                         # Inserisce una tupla con (ID_sensore, Tag_evento, Timestamp)
-                        self.event_queue.put_nowait(("bc_right", 1, t_now))
+                        self.event_queue.put_nowait(("bc_right", 3, t_now))
                     except Exception:
                         pass # Gestisce coda piena senza crashare l'IMU
                 
@@ -203,7 +203,7 @@ class DrowsinessClassifier:
                 # INVIO AL DISPATCHER TRAMITE CODA
                 if self.event_queue is not None:
                     try:
-                        self.event_queue.put_nowait(("bc_right", 3, t_now))
+                        self.event_queue.put_nowait(("bc_right", 1, t_now))
                     except Exception:
                         pass
                 
