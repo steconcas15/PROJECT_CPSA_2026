@@ -7,37 +7,22 @@
 # License: MIT
 
 from pathlib import Path
-from utils.logger import log_system
 
-class AudioLibrary:
+class _AudioLibraryMock:
     """
-    Dynamically provides access to named audio files with automatic validation.
-    Accessing AudioLibrary.alert will return the path, and log a warning if the file is missing.
+    Versione disabilitata per la fase di test.
+    Non esegue controlli sul disco e non genera warning.
+    Restituisce un percorso vuoto/finto per evitare crash di sistema.
     """
-
-    _base_path = Path(__file__).resolve().parent.parent / "assets" / "audio"
-    _files = {
-        "MISSING_FILE": "missing_audio_file.mp3",
-        "SPEAKER_CONNECT": "speaker_connected.mp3",
-        "CUSTOM_MILD_1": "stereotipia_non_pericolosa_1.mp3",
-        "CUSTOM_MILD_2": "stereotipia_non_pericolosa_2.mp3",
-        "CUSTOM_MILD_3": "stereotipia_non_pericolosa_3.mp3",
-        "CUSTOM_STRONG_1": "stereotipia_pericolosa_1.mp3",
-        "CUSTOM_STRONG_2": "stereotipia_pericolosa_2.mp3",
-        "CUSTOM_STRONG_3": "stereotipia_pericolosa_3.mp3",
-    }
 
     def __getattr__(self, name):
         """
-        Called automatically when accessing a missing attribute like AudioLibrary.alert
+        Qualsiasi richiesta (es. AudioLibrary.CUSTOM_MILD_1) 
+        finisce qui e restituisce None in modo silenzioso.
         """
-        if name in self._files:
-            path = self._base_path / self._files[name]
-            if not path.exists():
-                log_system(f"[AudioLibrary] Missing audio file: {path}", level="WARNING")
-                return self._base_path / self._files["MISSING_FILE"]
-            return path
-        raise AttributeError(f"[AudioLibrary] Unknown audio key: '{name}'")
+        # Restituiamo None. La maggior parte dei player audio ben scritti 
+        # ignora il comando se il percorso del file è None.
+        return None
 
 # Singleton instance
-AudioLibrary = AudioLibrary()
+AudioLibrary = _AudioLibraryMock()
