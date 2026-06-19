@@ -47,6 +47,9 @@ def main():
         log_system("[MAIN] Inizializzazione del SensorManager...")
         sensor_manager = SensorManager()
 
+        # Creazione dell'ActuatorManager
+        actuator_manager = ActuatorManager()
+
         # 2. Configurazione del VERO DrowsinessClassifier all'interno del manager delle IMU
         sensor_manager.classifier = DrowsinessClassifier()
         sensor_manager.synchronizer.buffer.set_features_sink(sensor_manager.classifier.recognize)
@@ -71,6 +74,10 @@ def main():
             if not expected_names.issubset(set(sensor_manager.get_sensors_names())):
                 log_system("[MAIN] Errore Critico: Hardware BlueCoin non rilevato. Uscita dal sistema.", level="ERROR")
                 return
+        
+        actuator_manager.scan_actuators()
+
+        actuator_manager.initialize_actuators()
 
         # 4. Avvio del Sensing Layer (I sensori iniziano a trasmettere pacchetti via BLE)
         sensor_manager.initialize_sensors()
@@ -82,20 +89,15 @@ def main():
         yolo_thread.start() # Il thread parte in standby ('idle'), la telecamera fisica rimane spenta
 
         # 6. Configurazione della Policy reale per l'attivazione dei dispositivi di allarme
-        # Inserisci gli ID precisi dei tuoi attuatori hardware (es. led cruscotto, buzzer, speaker)
-        attuatori_sistema = ["led_cruscotto", "speaker_allarme"]
-        drowsiness_policy = DrowsinessActivationPolicy(actuator_ids=attuatori_sistema)
-
-        # 7. Avvio del Direttore d'Orchestra (EventDispatcher)
-        
-        # Creazione dell'ActuatorManager e inizializzazione
-        actuator_manager = ActuatorManager()
-
-        actuator_manager.scan_actuators()
-
-        actuator_manager.initialize_actuators()
 
         actuators_list = actuator_manager.get_actuators_ids()
+
+         if not actuators_list:
+            log_system("[MAIN] No actuators discovered. Event detection and logging still executing")
+
+        drowsiness_policy = DrowsinessActivationPolicy(actuator_ids=actuators_list)
+
+        # 7. Avvio del Direttore d'Orchestra (EventDispatcher)
         
         # Sincronizza i dati estratti dalle IMU con l'accensione della telecamera e degli stimoli hardware
         dispatcher = EventDispatcher(
