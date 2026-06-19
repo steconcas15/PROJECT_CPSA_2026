@@ -335,13 +335,14 @@ class EventDispatcher:
 
                 self._set_latest_tag(tag, event)
 
-                log_system(
-                    f"[Dispatcher IN] raw_tag={raw_tag}, tag={tag}, "
-                    f"label={label}, last_tag={self._last_tag}, "
-                    f"video_stage={self._video_stage}, "
-                    f"queue_size={q.qsize() if hasattr(q, 'qsize') else 'unknown'}",
-                    level="INFO",
-                )
+                if(tag!=0):
+                    log_system(
+                        f"[Dispatcher IN] raw_tag={raw_tag}, tag={tag}, "
+                        f"label={label}, last_tag={self._last_tag}, "
+                        f"video_stage={self._video_stage}, "
+                        f"queue_size={q.qsize() if hasattr(q, 'qsize') else 'unknown'}",
+                        level="INFO",
+                    )
 
                 tag_changed = tag != self._last_tag
 
