@@ -192,7 +192,7 @@ class DrowsinessClassifier:
         Rilevamento sonnolenza con mappatura nativa per l'EventDispatcher:
           0 -> Sveglio, 1 -> SLOW_DRIFT, 2 -> NOD, 3 -> SUDDEN_DROP
         """
-        if t_now - self.last_event_time < 1.0:
+        if t_now - self.last_event_time < 5.0:
             return self._current_tag
 
         delta = theta - self.baseline
