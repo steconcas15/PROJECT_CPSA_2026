@@ -198,12 +198,21 @@ class EventDispatcher:
                 )
 
                 if bbox_is_fresh:
-                    log_system(
-                        f"[Dispatcher] ROI rilevata da YOLO per tag {tag}. "
-                        f"Passaggio automatico a MoveNet per tracking postura.",
-                        level="INFO",
-                    )
-                    self._activate_movenet("movenet_tag2")
+                    # CONTROLLO DI SICUREZZA: Passiamo a MoveNet solo se è stato configurato nel main
+                    if self.movenet_thread is not None:
+                        log_system(
+                            f"[Dispatcher] ROI rilevata da YOLO per tag {tag}. "
+                            f"Passaggio automatico a MoveNet per tracking postura.",
+                            level="INFO",
+                        )
+                        self._activate_movenet("movenet_tag2")
+                    else:
+                        # Se MoveNet è disabilitato (None), manteniamo YOLO attivo per mostrare 
+                        # il video a schermo e aggiornare la ROI
+                        log_system(
+                            f"[Dispatcher] ROI trovata ma MoveNet è inattivo. Mantenimento tracking su YOLO.",
+                            level="DEBUG",
+                        )
                     return
 
                 if self._yolo_tag2_started_ts is not None:
