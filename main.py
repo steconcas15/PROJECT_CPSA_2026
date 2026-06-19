@@ -20,7 +20,7 @@ from IMU_pipeline.classifiers.drowsiness_classifier import DrowsinessClassifier
 from sensors.sensor_manager import SensorManager
 
 # Moduli di sistema centralizzati del Framework CPSA
-from actuators.actuator_manager import get_actuator_manager  
+from actuators.actuator_manager import ActuatorManager  
 from utils.logger import log_system
 from utils.config import get_bluecoin_config
 from utils.video_dashboard import (
@@ -56,7 +56,7 @@ def main():
         expected_names = {
             entry.get("name") for entry in get_bluecoin_config() if entry.get("name")
         }
-
+        
         if expected_names:
             max_sensor_retries = 5
             retry_delay_sec = 3
@@ -87,9 +87,19 @@ def main():
         drowsiness_policy = DrowsinessActivationPolicy(actuator_ids=attuatori_sistema)
 
         # 7. Avvio del Direttore d'Orchestra (EventDispatcher)
+        
+        # Creazione dell'ActuatorManager e inizializzazione
+        actuator_manager = ActuatorManager()
+
+        actuator_manager.scan_actuators()
+
+        actuator_manager.initialize_actuators()
+
+        actuators_list = actuator_manager.get_actuators_ids()
+        
         # Sincronizza i dati estratti dalle IMU con l'accensione della telecamera e degli stimoli hardware
         dispatcher = EventDispatcher(
-            actuator_manager=get_actuator_manager(),
+            actuator_manager=actuator_manager,
             policy=drowsiness_policy,
             yolo_thread=yolo_thread,
             movenet_thread=None,  # Configurato a None in questa fase di test YOLO
