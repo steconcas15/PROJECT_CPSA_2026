@@ -191,7 +191,7 @@ def postprocess(output, frame, conf_threshold=0.6, nms_threshold=0.4):
                             1
                         )
                 
-                --- FALLBACK: IF NO FACE, ESTIMATE HEAD-SHOULDER AREA ---
+               # --- FALLBACK: IF NO FACE, ESTIMATE HEAD-SHOULDER AREA ---
                 if not face_found:
                     
                     # Estimate the vertical limit of the head-shoulder region (top 40% of the person's box)
