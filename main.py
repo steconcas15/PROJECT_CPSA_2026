@@ -20,7 +20,7 @@ from IMU_pipeline.classifiers.drowsiness_classifier import DrowsinessClassifier
 from sensors.sensor_manager import SensorManager
 
 # Moduli di sistema centralizzati del Framework CPSA
-from utils.actuator_manager import get_actuator_manager  
+from actuators.actuator_manager import get_actuator_manager  
 from utils.logger import log_system
 from utils.config import get_bluecoin_config
 from utils.video_dashboard import (
