@@ -44,7 +44,7 @@ def main():
         # Loop principale: rendering grafico continuo
         while True:
             # Passiamo 'None' al posto di movenet_thread così la dashboard disegna solo YOLO
-            dashboard.render(yolo_thread, None)
+            dashboard.render(yolo_thread) # 18_06_2026 Prima c'era None
 
             # Ascolta la tastiera per catturare la chiusura
             key = dashboard.wait_key(1)
@@ -66,6 +66,9 @@ def main():
         if yolo_thread:
             yolo_thread.stop()
 
+        #if resnet_thread:               # 18_06_2026
+            #resnet_thread.stop()        # 18_06_2026
+            
         if dashboard:
             unregister_dashboard_console()
             dashboard.close()

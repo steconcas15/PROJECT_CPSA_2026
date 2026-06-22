@@ -17,7 +17,7 @@ debug_system_console: true   # Choose to print system events on the console
 debug_event_console: true    # Choose to print events on the console
 
 # ---- DPU MODELS PATHS ----
-yolo_model_name: "/home/ubuntu/Desktop/PROJECT_CPSA_2026/Video_Pipeline/Yolo_v3/kv260_train_yolo_v3.xmodel"
+yolo_model_name: "/home/ubuntu/Desktop/PROJECT_CPSA_2026/Video_Pipeline/Yolo_v3/pynqdpu.tf_yolov3_voc.DPUCZDX8G_ISA1_B4096.2.5.0.xmodel"
 resnet_model_name: "/home/ubuntu/Desktop/PROJECT_CPSA_2026/Video_Pipeline/Resnet18/kv260_train_resnet18_drowsy.xmodel"
 
 # ---- SENSORS AND ACTUATORS CONFIGS ----
