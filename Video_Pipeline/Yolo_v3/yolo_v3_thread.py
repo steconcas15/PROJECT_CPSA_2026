@@ -129,6 +129,7 @@ def postprocess_and_classify(yolo_output, frame, resnet_runner, resnet_in_shape,
     boxes = []
     confidences = []
     class_ids = []
+    prediction_name = None
 
     for row in range(grid_size):
         for col in range(grid_size):
@@ -235,7 +236,7 @@ def postprocess_and_classify(yolo_output, frame, resnet_runner, resnet_in_shape,
                 cv2.putText(frame, f"{label} {conf:.2f}", (x1, max(0, y1 - 5)), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
-    return frame, person_detected, best_person_bbox, best_person_conf
+    return frame, person_detected, best_person_bbox, best_person_conf, prediction_name
 
 
 # ---------------------------------------------------------
@@ -262,6 +263,7 @@ class YoloDpuThread(threading.Thread):
         self.latest_person_bbox = None
         self.latest_person_conf = 0.0
         self.latest_person_bbox_ts = None
+        self.latest_prediction = None
         
         self.roi_state = roi_state
         self.phase = "idle"
@@ -277,7 +279,21 @@ class YoloDpuThread(threading.Thread):
             self.latest_frame = None
             self.latest_person_bbox = None
             self.latest_person_conf = 0.0
+            self.latest_person_bbox_ts = None
+            self.latest_prediction = None
 
+    def get_latest_result(self):
+        with self.result_lock:
+            return self.latest_result, self.latest_result_ts
+
+    def get_latest_prediction(self):
+        with self.result_lock:
+            return self.latest_prediction
+        
+    def get_latest_person_bbox(self): #
+        with self.result_lock:
+            return (self.latest_person_bbox, self.latest_person_conf, self.latest_person_bbox_ts)
+    
     def get_latest_frame(self):
         with self.result_lock:
             return self.latest_frame.copy() if self.latest_frame is not None else None
@@ -318,12 +334,37 @@ class YoloDpuThread(threading.Thread):
                 if self.stop_event.is_set(): break
                 
                 self.phase = "opening_camera"
-                self.cap = cv2.VideoCapture(self.camera_index)
-                if not self.cap.isOpened():
-                    self.active_event.clear()
+
+                # Retry con backoff: V4L2 puo' impiegare qualche centinaio di ms
+                # a liberare il device dopo un cap.release() precedente. Un fallimento
+                # immediato qui faceva active_event.clear() silenziosamente, disallineando
+                # lo stato del thread da quello creduto dal dispatcher (la camera restava
+                # "spenta per sempre" finche' non arrivava un nuovo evento esterno).
+                camera_open_attempts = 5
+                camera_open_retry_delay_sec = 0.3
+                opened = False
+
+                for attempt in range(camera_open_attempts):
+                    if self.stop_event.is_set() or not self.active_event.is_set():
+                        break
+
+                    self.cap = cv2.VideoCapture(self.camera_index)
+                    if self.cap.isOpened():
+                        opened = True
+                        break
+
+                    self.cap.release()
+                    self.cap = None
+                    time.sleep(camera_open_retry_delay_sec)
+
+                if not opened:
+                    # Non disattiviamo active_event: il dispatcher resta la fonte
+                    # di verita' su quando il video deve essere attivo o no.
+                    # Torniamo idle e ritenteremo al prossimo giro del while esterno.
                     self.phase = "idle"
+                    time.sleep(0.5)
                     continue
-                
+
                 self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                 self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
                 
@@ -347,7 +388,7 @@ class YoloDpuThread(threading.Thread):
                     self.yolo_runner.wait(yolo_job_id)
                     
                     # Postprocess combinato con classificazione inline
-                    frame, person_detected, person_bbox, person_conf = postprocess_and_classify(
+                    frame, person_detected, person_bbox, person_conf, prediction_name = postprocess_and_classify(
                         yolo_output_data[0], frame, 
                         self.resnet_runner, resnet_input_shape, resnet_input_tensor,
                         resnet_output_tensors, resnet_output_data
@@ -357,10 +398,12 @@ class YoloDpuThread(threading.Thread):
                         self.roi_state.update_from_yolo(bbox_xyxy=person_bbox, confidence=person_conf)
                         
                     now = time.monotonic()
+
                     with self.result_lock:
                         self.latest_result = person_detected
                         self.latest_result_ts = now
                         self.latest_frame = frame.copy()
+                        self.latest_prediction = prediction_name
                         if person_detected and person_bbox is not None:
                             self.latest_person_bbox = person_bbox
                             self.latest_person_conf = person_conf

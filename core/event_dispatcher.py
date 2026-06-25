@@ -1,6 +1,9 @@
 # event_dispatcher.py
 # Dispatches recognized sensor events to the activation policy
-# and triggers actions through the ActuatorManager
+# and triggers actions through the ActuatorManager.
+#
+# Video pipeline: YOLO+ResNet integrato (un unico thread, YoloDpuThread).
+# MoveNet non fa piu' parte del progetto: rimosso ogni riferimento.
 
 import queue
 import threading
@@ -9,29 +12,39 @@ import time
 from utils.event_queue import get_event_queue
 from utils.logger import log_system, log_event
 
+# Mappatura aggiornata per il caso Drowsiness (Sonnolenza)
 LABELS = {
-    0: "AWAKE",                  # No drowsiness
-    1: "SUSPECT_DROWSINESS",     # BlueCoin detects suspect head movement
-    2: "CONFIRMED_DROWSINESS",   # Yolo+ResNet confirm drowsiness
+    0: "SVEGLIO_OK",
+    1: "SLOW_DRIFT",    # Deriva lenta della testa
+    2: "NOD",           # Colpo di sonno / oscillazione
+    3: "SUDDEN_DROP",   # Crollo brusco della testa (Massimo pericolo)
 }
 
 ACTUATION_COOLDOWN = 5
-# When YOLO is reacquiring, only switch back to MoveNet if the latest YOLO bbox is at most YOLO_REFRESH_MAX_AGE_SEC old.
-YOLO_REFRESH_MAX_AGE_SEC = 1.0
-# YOLO_REACQUIRE_MIN_INTERVAL_SEC: Do not request YOLO reacquisition more often than once every YOLO_REACQUIRE_MIN_INTERVAL_SEC 
-YOLO_REACQUIRE_MIN_INTERVAL_SEC = 2.0
-# YOLO_REACQUIRE_TIMEOUT_SEC: If YOLO cannot reacquire a person after YOLO_REACQUIRE_TIMEOUT_SEC, stop the video stage.
-YOLO_REACQUIRE_TIMEOUT_SEC = 5.0
+
+# Quanto tempo ResNet deve riportare "NATURAL" ininterrottamente prima di
+# spegnere la camera. Si resetta a ogni predizione ResNet "DROWSY".
+AWAKE_OFF_DELAY_SEC = 5.0
+
 
 class EventDispatcher:
     """
-    Consumes IMU & Video events and dispatches actions via activation policy.
+    Consumes IMU classifier events and dispatches actions via activation policy.
 
-    Video behavior:
-        - tag=1 (Suspect) or tag=2 (Confirmed): Activate Video Pipeline.
-        - YOLO runs first to find the driver's face.
-        - Once the face is found, YOLO stops and ResNet starts classifying drowsiness.
-        - tag=0 (Awake): Stop all video threads.
+    Video behavior (Drowsiness):
+        - For tag=1, 2, 3 (Any drowsiness sign from IMU): activates the
+          YOLO+ResNet thread. This is a trigger only.
+        - Deactivation is governed exclusively by ResNet's prediction on the
+          video bbox (DROWSY/NATURAL), NOT by the IMU tag: the camera turns
+          off only after ResNet reports NATURAL for AWAKE_OFF_DELAY_SEC
+          seconds uninterrupted. IMU and ResNet are independent sensors;
+          the head (IMU) can return to neutral while the face/posture seen
+          on camera (ResNet) still shows drowsiness, so the IMU tag alone
+          must never turn the camera off.
+
+    The dispatcher is the sole authority on when the video thread should be
+    active. The video thread itself never self-deactivates; this avoids the
+    state desync that caused the camera to stay off after a single failure.
     """
 
     def __init__(
@@ -39,7 +52,6 @@ class EventDispatcher:
             actuator_manager,
             policy,
             yolo_thread=None,
-            resnet_thread=None,
             roi_state=None,
         ):
         self.actuator_manager = actuator_manager
@@ -57,13 +69,20 @@ class EventDispatcher:
         self._latest_event = None
 
         self.yolo_thread = yolo_thread
-        self.resnet_thread = resnet_thread
 
-        # None | "yolo_active" | "resnet_active"
-        self._video_stage = None
+        # Stato video: False (off) o True (on). Niente piu' stage intermedi.
+        self._video_on = False
 
-        self._last_yolo_reacquire_request_ts = None
-        self._yolo_started_ts = None
+        # Throttle per non spammare activate() se il thread fatica ad aprire la camera.
+        self._last_activate_attempt_ts = None
+        self._activate_retry_interval_sec = 1.0
+
+        # Timer di spegnimento: parte quando ResNet riporta NATURAL e si
+        # azzera ogni volta che ResNet riporta DROWSY. La camera si spegne
+        # solo se ResNet resta "NATURAL" ininterrottamente per
+        # AWAKE_OFF_DELAY_SEC secondi. Governato esclusivamente da ResNet,
+        # NON dal tag IMU (vedi _evaluate_resnet_off_timer).
+        self._awake_since_ts = None
 
     def start(self):
         self._thread.start()
@@ -71,7 +90,7 @@ class EventDispatcher:
 
     def stop(self):
         self._stop_event.set()
-        self._stop_video_threads()
+        self._stop_video_thread()
 
         if self._thread.is_alive():
             self._thread.join()
@@ -109,148 +128,116 @@ class EventDispatcher:
 
         return False
 
-    def _stop_video_threads(self):
+    def _stop_video_thread(self):
         if self.yolo_thread and self.yolo_thread.is_active():
-            log_system("[Dispatcher] Stopping YOLO thread.", level="INFO")
+            log_system("[Dispatcher] Stopping YOLO+ResNet thread.", level="INFO")
             self.yolo_thread.deactivate()
             self._wait_thread_idle(self.yolo_thread, "YOLO")
 
-        if self.resnet_thread and self.resnet_thread.is_active():
-            log_system("[Dispatcher] Stopping ResNet thread.", level="INFO")
-            self.resnet_thread.deactivate()
-            self._wait_thread_idle(self.resnet_thread, "ResNet")
-
-        self._video_stage = None
-        self._yolo_started_ts = None
+        self._video_on = False
+        self._last_activate_attempt_ts = None
+        self._awake_since_ts = None
 
         if self.roi_state is not None:
             self.roi_state.clear()
 
-    def _activate_yolo(self, stage):
-        if self.resnet_thread and self.resnet_thread.is_active():
-            log_system("[Dispatcher] Stopping ResNet before activating YOLO.", level="INFO")
-            self.resnet_thread.deactivate()
-            self._wait_thread_idle(self.resnet_thread, "ResNet")
-
+    def _start_video_thread(self):
         if self.yolo_thread is None:
             log_system("[Dispatcher] YOLO thread not configured.", level="WARNING")
-            self._video_stage = None
             return
 
-        previous_stage = self._video_stage
-
-        if not self.yolo_thread.is_active():
-            log_system(f"[Dispatcher] Activating YOLO. stage={stage}", level="INFO")
-            self.yolo_thread.activate()
-
-        self._video_stage = stage
-
-        if previous_stage != stage:
-            self._yolo_started_ts = time.monotonic()
-
-    def _activate_resnet(self, stage):
-        if self.yolo_thread and self.yolo_thread.is_active():
-            log_system("[Dispatcher] Stopping YOLO before activating ResNet.", level="INFO")
-            self.yolo_thread.deactivate()
-            self._wait_thread_idle(self.yolo_thread, "YOLO")
-
-        if self.resnet_thread is None:
-            log_system("[Dispatcher] ResNet thread not configured.", level="WARNING")
-            self._video_stage = None
+        # Se il thread e' gia' attivo (active_event set), non richiamiamo activate()
+        # di nuovo: e' idempotente ma evitiamo log/rumore inutile.
+        if self.yolo_thread.is_active():
+            self._video_on = True
             return
 
-        if not self.resnet_thread.is_active():
-            log_system(f"[Dispatcher] Activating ResNet. stage={stage}", level="INFO")
-            self.resnet_thread.activate()
+        now = time.monotonic()
+        if (
+            self._last_activate_attempt_ts is not None
+            and (now - self._last_activate_attempt_ts) < self._activate_retry_interval_sec
+        ):
+            # Throttle: non richiamare activate() ad ogni singolo poll/evento.
+            # is_active() resta False finche' il thread non apre la camera,
+            # quindi senza throttle qui rientreremmo in questo branch di
+            # continuo finche' la camera non si apre.
+            return
 
-        self._video_stage = stage
+        self._last_activate_attempt_ts = now
 
-        self._yolo_started_ts = None
+        log_system("[Dispatcher] Activating YOLO+ResNet thread.", level="INFO")
+        self.yolo_thread.activate()
+        self._video_on = True
 
     def _apply_video_state_for_tag(self, tag):
         """
-        Camera logic: 
-        If tag is 1 (Suspect) or 2 (Confirmed), camera must be on.
-        YOLO finds the face -> ResNet confirms drowsiness.
-        """
+        L'IMU (tag 1/2/3) e' solo il TRIGGER di accensione della camera.
+        Una volta accesa, lo spegnimento NON dipende piu' dal tag IMU:
+        e' deciso esclusivamente da ResNet (vedi _evaluate_resnet_off_timer),
+        che guarda la predizione sulla bbox video frame per frame.
 
-        if tag in (1,2):
-            if self._video_stage is None:
-                self._activate_yolo()
+        Questo perche' IMU e ResNet sono due sensori indipendenti: la testa
+        (IMU) puo' tornare in posizione neutra mentre il volto/postura
+        ripresi dalla camera (ResNet) mostrano ancora sonnolenza, e in quel
+        caso la camera deve restare accesa finche' ResNet non confirma
+        "sveglio" per AWAKE_OFF_DELAY_SEC secondi ininterrotti.
+        """
+        if tag in (1, 2, 3):
+            self._start_video_thread()
             return
 
-            # If YOLO is active, look for the person/face bounding box
-            if self._video_stage == "yolo_active":
-                if self.yolo_thread is None:
-                    return
+        # tag == 0 o non valido: non spegne nulla qui. Lo spegnimento e'
+        # competenza esclusiva di _evaluate_resnet_off_timer().
 
-                person_bbox, person_conf, person_bbox_ts = (
-                    self.yolo_thread.get_latest_person_bbox()
-                )
-                bbox_is_fresh = (
-                    person_bbox is not None
-                    and person_bbox_ts is not None
-                    and (time.monotonic() - person_bbox_ts) <= YOLO_REFRESH_MAX_AGE_SEC
-                )
+    def _evaluate_resnet_off_timer(self):
+        """
+        Timer di spegnimento basato SOLO sulla predizione ResNet:
 
-                if bbox_is_fresh:
-                    log_system(
-                        f"[Dispatcher] Fresh YOLO person ROI acquired for tag=2. "
-                        f"bbox={person_bbox}, conf={person_conf:.2f}. "
-                        f"Switching to ResNet.",
-                        level="INFO",
-                    )
-                    self._activate_resnet()
+          - prediction == "DROWSY": azzera il timer (qualsiasi segno di
+            sonnolenza visivo resetta il conto alla rovescia).
+          - prediction == "NATURAL": fa partire (o continua) il timer;
+            la camera si spegne solo se resta "NATURAL" ininterrottamente
+            per AWAKE_OFF_DELAY_SEC secondi.
+          - prediction is None (camera spenta, o nessun frame ancora
+            elaborato dopo l'accensione): non fa partire nulla.
 
-                    return
+        Va chiamato periodicamente (poll), non solo agli eventi IMU,
+        perche' ResNet produce un nuovo risultato per ogni frame video,
+        a un ritmo indipendente dal flusso di eventi del classificatore IMU.
+        """
+        if not self._video_on or self.yolo_thread is None:
+            self._awake_since_ts = None
+            return
 
-                # Timeout if YOLO cannot find the driver
-                if self._yolo_started_ts is not None:
-                    yolo_elapsed = time.monotonic() - self._yolo_started_ts
+        prediction = self.yolo_thread.get_latest_prediction()
 
-                    if yolo_elapsed >= YOLO_REACQUIRE_TIMEOUT_SEC:
-                        log_system(
-                            f"[Dispatcher] YOLO reacquisition timed out after "
-                            f"{yolo_elapsed:.1f}s. Stopping video threads.",
-                            level="WARNING",
-                        )
-                        self._stop_video_threads()
+        if prediction == "DROWSY":
+            self._awake_since_ts = None
+            return
 
-                return
+        if prediction != "NATURAL":
+            # None (nessun frame valido ancora, es. subito dopo l'accensione
+            # o nessuna persona rilevata): non avviamo il conteggio.
+            return
 
-            # If ResNet is active, check if tracking is lost (roi_state)
-            if self._video_stage == "resnet_active":
-                if self.resnet_thread is None:
-                    return
+        now = time.monotonic()
 
-                if self.roi_state is not None and self.roi_state.needs_reacquire():
-                    now = time.monotonic()
+        if self._awake_since_ts is None:
+            self._awake_since_ts = now
+            return
 
-                    if (
-                        self._last_yolo_reacquire_request_ts is not None
-                        and now - self._last_yolo_reacquire_request_ts < YOLO_REACQUIRE_MIN_INTERVAL_SEC
-                    ):
-                        return
-
-                    self._last_yolo_reacquire_request_ts = now
-
-                    log_system(
-                        "[Dispatcher] ResNet requested ROI reacquisition. Switching back to YOLO.",
-                        level="INFO",
-                    )
-                    self._activate_yolo()
-                    return
-
-                if not self.resnet_thread.is_active():
-                    self._activate_resnet()
-
-                return
-        # If tag is 0 (Awake), turn off the camera to save resources
-        self._stop_video_threads()
+        if (now - self._awake_since_ts) >= AWAKE_OFF_DELAY_SEC:
+            log_system(
+                f"[Dispatcher] ResNet ha rilevato NATURAL per "
+                f"{AWAKE_OFF_DELAY_SEC:.0f}s ininterrotti. Spegnimento camera.",
+                level="INFO",
+            )
+            self._stop_video_thread()
+            self._awake_since_ts = None
 
     def _trigger_policy_action(self, event):
         log_system(
-            f"[Dispatcher POLICY IN] tag={event.get('drowsiness_tag')} "
+            f"[Dispatcher POLICY IN] tag={event.get('stereotipy_tag')} "
             f"source={event.get('source')}",
             level="INFO",
         )
@@ -266,20 +253,16 @@ class EventDispatcher:
             log_system("[Dispatcher] Policy returned no action.")
             return None
 
-        # Pass parameters to the actuator manager using the new action_type
-        action_type = result["params"].get("action_type", "drowsiness_event")
-        
         self.actuator_manager.trigger(
             actuator_id=result["actuator_id"],
-            action_type=action_type,
+            action_type="stereotipy_event",
             **result["params"],
         )
 
         return result
 
     def _should_trigger_policy(self, tag, now_time):
-       # ACTUATION TRIGGER: happens ONLY if drowsiness is confirmed (tag == 2)
-        if tag != 2:
+        if tag not in (1, 2, 3):
             return False
 
         return (
@@ -314,10 +297,13 @@ class EventDispatcher:
                 if latest_tag is not None:
                     self._apply_video_state_for_tag(latest_tag)
 
+                # ResNet detta lo spegnimento indipendentemente dal flusso
+                # di eventi IMU: va valutato ad ogni giro, coda vuota o no.
+                self._evaluate_resnet_off_timer()
                 continue
 
             try:
-                raw_tag = event.get("drowsiness_tag", "")
+                raw_tag = event.get("stereotipy_tag", "")
 
                 try:
                     tag = int(raw_tag)
@@ -332,7 +318,8 @@ class EventDispatcher:
                 log_system(
                     f"[Dispatcher IN] raw_tag={raw_tag}, tag={tag}, "
                     f"label={label}, last_tag={self._last_tag}, "
-                    f"video_stage={self._video_stage}, "
+                    f"video_on={self._video_on}, "
+                    f"resnet_pred={self.yolo_thread.get_latest_prediction() if self.yolo_thread else None}, "
                     f"queue_size={q.qsize() if hasattr(q, 'qsize') else 'unknown'}",
                     level="INFO",
                 )
@@ -349,6 +336,7 @@ class EventDispatcher:
                     self._last_actuation_time = None
 
                 self._apply_video_state_for_tag(tag)
+                self._evaluate_resnet_off_timer()
 
                 result = self._process_policy_for_event(event, tag, now_time)
 
@@ -367,7 +355,7 @@ class EventDispatcher:
                         feature_type="imu",
                         event=label,
                         actuations=actuations,
-                        source=event.get("source", "system"),
+                        source=event.get("source", "dual_wrist"),
                     )
 
             except Exception as e:
