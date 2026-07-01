@@ -19,6 +19,49 @@
 * Drowsiness alert policy with feedback deployment based on active actuator ID.
 * Centralized shutdown of dispatcher, video threads, sensors, actuators, and dashboard resources
 
+### Architecture and Working Principle
+
+The system is organized around an IMU-first event loop. A BlueCoin device provides motion data to monitor driver state. The classifier produces drowsiness tags. The dispatcher consumes the latest tag, turns on video stage if needed, and asks the actuation policy to select feedback behavior. The dashboard owns video rendering and termination input.
+
+### Architecture
+
+```text
+BlueCoin BLE Sensors
+  │
+  ▼
+SensorManager
+  │
+  ▼
+Feature Listeners
+  │
+  ▼
+Synchronizer
+  │
+  ▼
+DataBuffer
+  │
+  ▼
+DrowsinessClassifier
+  │
+  ▼
+Event Queue
+  │
+  ▼
+EventDispatcher ────► YOLO DPU Thread (Standby / Active)
+  │                         │
+  │                         ▼
+  │                   ResNet18 Inference
+  │
+  ▼
+DrowsyAlertPolicy
+  │
+  ▼
+ActuatorManager
+  │
+  └── Bluetooth Speaker
+
+VideoDashboard renders YOLO / ResNet frames and receives the q key for GUI shutdown.
+
 ### Runtime Flow
 ```text
 1. Create the VideoDashboard and register the dashboard console.
