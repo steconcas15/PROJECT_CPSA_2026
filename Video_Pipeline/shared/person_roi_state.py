@@ -1,3 +1,22 @@
+"""
+Module: person_roi_state.py
+
+What this file does:
+    This class manages the "bounding box" that surrounds a 
+    person detected by a YOLO model.
+
+Why it is useful:
+    1. Smoother movement: Without this code, the box on the screen would 
+       "jump" or shake around. We use the Exponential Moving Average (EMA) 
+       technique to make the movement look natural and smooth.
+    2. Time management: If the camera stops seeing the person, the system 
+       won't keep showing old, wrong information.
+    3. Data protection: Because the video analysis runs in the background 
+       at the same time as other parts of the program, we use a "Lock." 
+       This prevents errors that happen when two parts of the program 
+       try to change the same data at the same time.
+"""
+
 import threading
 import time
 
