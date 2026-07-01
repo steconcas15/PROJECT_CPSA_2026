@@ -1,6 +1,6 @@
 # Cyber-Physical-Systems for Real-Time Driver Drowsiness Detection and Road Safety
 
-### 📂 Project Structure
+### Project Structure
 
 ```text
 📂 CPSA_2026/
