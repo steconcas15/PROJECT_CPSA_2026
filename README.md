@@ -22,12 +22,12 @@
 
 ### Important Runtime Details
 
-* **The DPU overlay must be loaded before `main.py` starts.** Use `bash xmutil_load_dpu.sh` at system startup to program the FPGA fabric on the KV260 board.
-* **`main.py` is the direct runtime entry point.** No wrapper bash scripts are required to launch the core executive layer.
-* **The `YoloDpuThread` is started at boot but stays idle**, keeping the physical camera interface suspended until the `EventDispatcher` explicitly activates it upon event detection.
-* **The `VideoDashboard` is responsible for the main execution loop**, rendering frames (handling both standby UI and active video feeds) and reading GUI key inputs (e.g., pressing `'q'` to gracefully terminate).
-* **The system aborts startup completely** if the expected BlueCoin devices configured in `config.yaml` are not discovered after the 5-retry loop window.
-* **If no hardware actuators are discovered**, the core event detection, IMU classification pipelines, and logging systems will still execute normally.
+* The DPU overlay must be loaded before `main.py` starts. Use `bash xmutil_load_dpu.sh` at system startup to program the FPGA fabric on the KV260 board.
+* `main.py` is the direct runtime entry point.
+* The `YoloDpuThread` is started at boot but stays idle, keeping the physical camera interface suspended until the `EventDispatcher` activates it upon event detection.
+* The `VideoDashboard` is responsible for the main execution loop, rendering frames and reading GUI key inputs (e.g., pressing `'q'` to gracefully terminate).
+* The system aborts startup completely if the expected BlueCoin devices configured in `config.yaml` are not discovered after the 5-retry loop window.
+* If no hardware actuator is discovered, the core event detection, IMU classification pipelines, and logging systems will still execute normally.
 
 ### Project Structure 
 ```text
