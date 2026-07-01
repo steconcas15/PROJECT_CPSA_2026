@@ -1,5 +1,24 @@
 # Cyber-Physical-Systems for Real-Time Driver Drowsiness Detection and Road Safety
 
+### System View
+
+* BLE BlueCoin acquisition for driver monitoring.
+* Accelerometer and gyroscope used to detect involuntary head falls.
+* IMU synchronization and timestamp alignment via dedicated synchronizer module.
+* Sliding-window buffering with configurable overlap to stream sensor features.
+* Drowsiness classifier integrated directly into the IMU pipeline.
+* Event queue with dispatching operations.
+* The event dispatcher manages synchronization between IMU events, YOLO activation and hardware triggers.
+* Staged DPU video pipeline:
+  * Hardware-accelerated YOLOv3 person/driver detection on the Xilinx DPU.
+  * ResNet18 classification developed for drowsiness and driver state estimation.
+  * Dynamically updated bounding box status managed via a PersonRoiState.
+* The dashboard GUI renders runtime states (standby/active feed) and handles user termination.
+* Modular actuator manager supporting:
+  * Bluetooth (BT) speaker feedback orchestration.
+* Drowsiness alert policy with feedback deployment based on active actuator ID.
+* Centralized shutdown of dispatcher, video threads, sensors, actuators, and dashboard resources
+
 ### Runtime Flow
 ```text
 1. Create the VideoDashboard and register the dashboard console.
