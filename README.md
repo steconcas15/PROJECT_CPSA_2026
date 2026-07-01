@@ -1,5 +1,25 @@
 # Cyber-Physical-Systems for Real-Time Driver Drowsiness Detection and Road Safety
 
+### Runtime Flow
+```text
+1. Create the VideoDashboard and register the dashboard console.
+2. Create SensorManager and ActuatorManager.
+3. Instantiate DrowsinessClassifier.
+4. Scan BLE sensor and read expected BlueCoin name from config.yaml.
+5. Retry BlueCoin discovery up to 5 times if expected device is missing (exit on failure).
+6. Scan for speaker actuator and initialize it.
+7. Read discovered actuator ID from the ActuatorManager.
+8. Initialize and start sensor thread.
+9. Create PersonRoiState.
+10. Create YoloDpuThread (passing the roi_state).
+11. Create DrowsyAlertPolicy using the discovered actuator ID.
+12. Create EventDispatcher with actuator manager, policy, YOLO thread, and roi_state.
+13. Start the EventDispatcher thread.
+14. Enter the main dashboard render loop.
+15. Loop until 'q' is pressed in the GUI or a KeyboardInterrupt (Ctrl+C) is received.
+16. Cleanly stop dispatcher, sensor manager, actuator manager, video thread, and unregister dashboard resources.
+```
+
 ### Project Structure 
 ```text
 CPSA_2026/
@@ -59,3 +79,4 @@ CPSA_2026/
 ├── test_actuators.py
 ├── trash.py
 └── xmutil_load_dpu.sh
+```
