@@ -60,8 +60,8 @@ ActuatorManager
   │
   └── Bluetooth Speaker
 
-VideoDashboard renders YOLO / ResNet frames and receives the q key for GUI shutdown.
 ```
+VideoDashboard renders YOLO / ResNet frames and receives the q key for GUI shutdown.
 
 ### Runtime Flow
 ```text
