@@ -7,32 +7,35 @@ YOLO_SMOOTH_ALPHA = 0.85
 
 class PersonRoiState:
     """
-    Thread-safe shared person ROI state.
-
+    Manages the state and smoothing of a person's Bounding Box (ROI) 
+    in a thread-safe manner.
+    
     Coordinates are always full-frame xyxy:
         (x1, y1, x2, y2)
 
-    Internally, the ROI is smoothed in cx, cy, w, h space.
+    Internally, the ROI is smoothed in cx, cy, w, h space
 
     The state is intended to be:
         - written by YOLO when a person is detected
     """
 
     def __init__(self):
+        # Lock to ensure thread safety between detection (writer) and usage (reader)
         self._lock = threading.Lock()
 
-        # Latest raw bbox received from YOLO.
+        # Latest raw bbox received from the YOLO detector
         self._raw_bbox_xyxy = None
 
-        # Smoothed bbox returned to consumers.
+        # Smoothed bbox returned to consumers
         self._bbox_xyxy = None
 
-        # Internal smoothed representation: cx, cy, w, h.
+        # Internal representation for smoothing: center coordinates (cx, cy) and size (w, h)
         self._smoothed_cxcywh = None
 
         self._confidence = 0.0
         self._timestamp = None
 
+        # Flag to indicate if the object is lost or needs re-detection
         self._need_reacquire = True
 
     # -----------------------------------------------------
@@ -41,10 +44,8 @@ class PersonRoiState:
 
     def update_from_yolo(self, bbox_xyxy, confidence):
         """
-        Update ROI using a YOLO person detection.
-
-        YOLO is treated as a stronger correction source, so it uses
-        a higher smoothing alpha.
+        Public method to inject new YOLO detection data into the state.
+        Uses the predefined alpha constant for consistency.
         """
         self._update(
             bbox_xyxy=bbox_xyxy,
@@ -58,6 +59,7 @@ class PersonRoiState:
 
     @staticmethod
     def _xyxy_to_cxcywh(bbox_xyxy):
+        """Converts coordinate format [x1, y1, x2, y2] to [center_x, center_y, width, height]."""
         x1, y1, x2, y2 = bbox_xyxy
 
         w = float(x2 - x1)
@@ -69,6 +71,7 @@ class PersonRoiState:
 
     @staticmethod
     def _cxcywh_to_xyxy(cxcywh):
+        """Converts [center_x, center_y, width, height] back to [x1, y1, x2, y2]."""
         cx, cy, w, h = cxcywh
 
         x1 = cx - 0.5 * w
@@ -85,6 +88,7 @@ class PersonRoiState:
 
     @staticmethod
     def _is_valid_bbox(bbox_xyxy):
+        """Validates that the bbox exists and has positive dimensions."""
         if bbox_xyxy is None:
             return False
 
@@ -93,6 +97,7 @@ class PersonRoiState:
         return x2 > x1 and y2 > y1
 
     def _update(self, bbox_xyxy, confidence, alpha):
+        """Performs the internal EMA math and updates the state under a thread lock."""
         if not self._is_valid_bbox(bbox_xyxy):
             return
 
@@ -111,8 +116,10 @@ class PersonRoiState:
 
         with self._lock:
             if self._smoothed_cxcywh is None:
+                # Initialize with the first valid detection
                 smoothed = new_cxcywh
             else:
+                # Calculate EMA: New State = (Alpha * New) + ((1 - Alpha) * Old)
                 old_cx, old_cy, old_w, old_h = self._smoothed_cxcywh
                 new_cx, new_cy, new_w, new_h = new_cxcywh
 
@@ -128,6 +135,7 @@ class PersonRoiState:
             if not self._is_valid_bbox(smoothed_bbox):
                 return
 
+            # Commit the update to state
             self._raw_bbox_xyxy = raw_bbox
             self._bbox_xyxy = smoothed_bbox
             self._smoothed_cxcywh = smoothed
@@ -140,13 +148,7 @@ class PersonRoiState:
     # -----------------------------------------------------
 
     def get_snapshot(self):
-        """
-        Return the current ROI state without age filtering.
-
-        Returns:
-            dict with raw bbox, smoothed bbox, confidence, timestamp,
-            and need_reacquire.
-        """
+        """Returns the complete current state for diagnostics or logging."""
         with self._lock:
             return {
                 "bbox_xyxy": self._bbox_xyxy,
@@ -158,15 +160,8 @@ class PersonRoiState:
 
     def get_valid_roi(self, max_age_sec=None):
         """
-        Return smoothed bbox if available and not stale.
-
-        Args:
-            max_age_sec:
-                If None, no age filtering is applied.
-                Otherwise, bbox is returned only if recent enough.
-
-        Returns:
-            Smoothed (x1, y1, x2, y2) or None.
+        Retrieves the smoothed bbox only if it is currently valid and not expired.
+        'max_age_sec' acts as a TTL (Time-To-Live) for the detection.
         """
         with self._lock:
             if self._bbox_xyxy is None or self._timestamp is None:
@@ -183,26 +178,17 @@ class PersonRoiState:
             return self._bbox_xyxy
 
     def mark_reacquire(self):
-        """
-        Mark current ROI as unreliable.
-
-        The smoothed bbox is intentionally kept in memory, but get_valid_roi()
-        will stop returning it until a new update clears need_reacquire.
-        """
+        """Signals that the current track is lost/unreliable."""
         with self._lock:
             self._need_reacquire = True
 
     def needs_reacquire(self):
-        """
-        Return True if YOLO should reacquire the person ROI.
-        """
+        """Checks if the system is currently looking for a new detection."""
         with self._lock:
             return self._need_reacquire
 
     def clear(self):
-        """
-        Clear the ROI completely.
-        """
+        """Resets the state to default values."""
         with self._lock:
             self._raw_bbox_xyxy = None
             self._bbox_xyxy = None
