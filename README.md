@@ -1,38 +1,61 @@
 # Cyber-Physical-Systems for Real-Time Driver Drowsiness Detection and Road Safety
 
-### 📂 Struttura del Progetto
+### 📂 Project Structure
 
 ```text
 📂 CPSA_2026/
+ ┃
+ ┣ 📂 DPU_FIRMWARE/
+ ┃ ┗ 📜 kv260-benchmark-b4096.xclbin
+ ┃
+ ┣ 📂 IMU_pipeline/
+ ┃ ┣ 📂 classifiers/
+ ┃ ┃ ┗ 📜 drowsiness_classifier.py
+ ┃ ┗ 📂 data_stream/
+ ┃   ┣ 📜 data_buffer.py
+ ┃   ┣ 📜 data_processing_wrapper_quat.py
+ ┃   ┗ 📜 synchronizer.py
+ ┃
+ ┣ 📂 Video_Pipeline/
+ ┃ ┣ 📂 Resnet18/
+ ┃ ┃ ┗  📜 kv260_train_resnet18_drowsy.xmodel 
+ ┃ ┣ 📂 Yolo_v3/
+ ┃ ┃ ┣ 📜 pynqdpu.tf_yolov3_voc.DPUCZDX8G_ISA1_B4096.2.5.0.xmodel
+ ┃ ┃ ┗ 📜 yolo_v3_thread.py
+ ┃ ┗ 📂 shared/
+ ┃   ┗ 📜 person_roi_state.py
+ ┃
  ┣ 📂 actuators/
- ┃ ┣ 📜 actuator_manager.py
- ┃ ┣ 📂 BLE/
- ┃ ┃ ┗ 📜 metamotion.py
  ┃ ┣ 📂 BT/
  ┃ ┃ ┗ 📜 speaker.py
- ┃ ┗ 📂 WIFI/
- ┃   ┗ 📜 led_strip.py
- ┣ 📂 assets/
- ┃ ┗ 📂 audio/
- ┃   ┗ 🎵 *.mp3
+ ┃ ┗ 📜 actuator_manager.py
+ ┃
  ┣ 📂 core/
  ┃ ┣ 📜 actuation_policy.py
  ┃ ┗ 📜 event_dispatcher.py
- ┣ 📂 IMU_pipeline/
- ┃ ┣ 📂 classifiers/
- ┃ ┃ ┗ 📂 stereotipy_classifier/
- ┃ ┃   ┣ 📜 stereotipy_classifier.py
- ┃ ┃   ┣ 📜 predict_models_wrapper_quat.py
- ┃ ┃   ┣ ⚙️ libPredictPericolosaWristsQuat.so
- ┃ ┃   ┗ 📂 Predict_Pericolosa_Wrists_Quat/
- ┃ ┗ 📂 data_stream/
- ┃   ┣ 📜 synchronizer.py
- ┃   ┣ 📜 data_buffer.py
- ┃   ┣ 📜 data_processing_wrapper_quat.py
- ┃   ┣ ⚙️ libProcessDataWristsQuat.so
- ┃   ┗ 📂 ProcessDataWristsQuat/
- ┗ 📂 sensors/
-   ┣ 📜 sensor_manager.py
-   ┗ 📂 BLE/
-     ┣ 📜 bluecoin.py
-     ┗ 📜 feature_listeners.py
+ ┃
+ ┣ 📂 sensors/
+ ┃ ┣ 📂 BLE/
+ ┃ ┃ ┣ 📜 bluecoin.py
+ ┃ ┃ ┣ 📜 feature_listeners.py
+ ┃ ┃ ┗ 📜 feature_mems_sensor_fusion_compact.py
+ ┃ ┗ 📜 sensor_manager.py
+ ┃
+ ┣ 📂 test/
+ ┃ ┗ 📜 test_actuators.py
+ ┃
+ ┣ 📂 utils/
+ ┃ ┣ 📂 __pycache__/
+ ┃ ┣ 📜 config.py
+ ┃ ┣ 📜 event_queue.py
+ ┃ ┣ 📜 lock.py
+ ┃ ┣ 📜 logger.py
+ ┃ ┗ 📜 video_dashboard.py
+ ┃
+ ┣ 📜 LICENSE
+ ┣ 📜 README.md
+ ┣ 📜 config.yaml
+ ┣ 📜 main.py
+ ┣ 📜 test_actuators.py
+ ┣ 📜 trash.py
+ ┗ 📜 xmutil_load_dpu.sh
