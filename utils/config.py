@@ -45,7 +45,7 @@ def get_log_path():
     Returns the resolved base log path, expanding "~" to the user's home directory.
     """
     default_base = str(Path.home() / "Documents" / "STOPME" / "logs")
-    # Corretto: aggiunto os.path.expanduser (in alternativa si poteva usare Path(...).expanduser())
+    
     return str(Path(os.path.expanduser(CONFIG.get("log_base_path", default_base))))
 
 def actuation_details_enabled() -> bool:
