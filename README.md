@@ -209,7 +209,7 @@ YOLO & ResNet18 DPU Thread responsibilities:
   * **Stage 1 (Reconstruction):** It isolates only the top 40% height of the person's body box (where the head and shoulders are expected to be), calculates the exact horizontal center, and forces a custom width equal to 120% of that isolated height to create a perfectly proportioned box around the head and neck.
   * **Stage 2 (Margin Expansion):** This newly calculated box is then expanded outward by 30% on all sides. This acts like "zooming out" slightly to include surrounding context (like hair, ears, or clothing), which helps the secondary AI model understand the image better.
 
-  > 📐 **Visual Breakdown of the Fallback Strategy:**
+  > **Visual Breakdown of the Fallback Strategy:**
   > ```text
   >    Original YOLO Box             Stage 1: Estimated ROI       Stage 2: Final DPU Input
   > ┌─────────────────────┐        ┌───────────────────────┐     ┌────────────────────────────┐
