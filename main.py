@@ -1,7 +1,7 @@
 # main.py
-# Realtime Core Executive Layer for Drowsiness Detection Pipeline
+# Real-time Core Executive Layer for Drowsiness Detection Pipeline
 #
-# Author: Francesco Urru (Adapted for Drowsiness Core)
+# Author: Francesco Urru
 # Repository: https://github.com/frarvo/CPSA_2026
 # License: MIT
 
@@ -29,7 +29,6 @@ from utils.video_dashboard import (
     unregister_dashboard_console,
 )
 
-
 def main():
     sensor_manager = None
     dashboard = None
@@ -38,7 +37,7 @@ def main():
     actuator_manager = None
 
     try:
-        # 1. Initialize UI (OpenCV Dashboard)
+        # 1. Graphical Interface Initialization (OpenCV Dashboard on screen)
         dashboard = VideoDashboard(
             window_name="CPSA 2026 - Drowsiness Detection System",
             fullscreen=False
@@ -51,7 +50,7 @@ def main():
         
         actuator_manager = ActuatorManager()
 
-        # Inject the Drowsiness Classifier into the IMU pipeline
+        # 2. Configure the DrowsinessClassifier within the IMU manager
         sensor_manager.classifier = DrowsinessClassifier()
         sensor_manager.synchronizer.buffer.set_features_sink(sensor_manager.classifier.recognize)
 
@@ -95,10 +94,10 @@ def main():
         # Initialize the alert policy with available actuators    
         policy = DrowsyAlertPolicy(actuator_ids=actuators_list)
         
-        # 5. Initialize ROI state and start the YOLOv3 DPU thread
+        # 5. Initialize ROI state and start YOLOv3 hardware thread on the DPU
         roi_state = PersonRoiState()
         yolo_thread = YoloDpuThread(roi_state=roi_state)
-        yolo_thread.start() # Starts in 'idle' mode, physical camera stays off for now
+        yolo_thread.start() # Thread starts in standby ('idle'), physical camera remains off
 
         # 6. Start the Orchestrator (EventDispatcher)
         # Connects IMU events with camera activation and hardware triggers
@@ -110,11 +109,47 @@ def main():
         )
         dispatcher.start()
 
-        log_system("[MAIN] Event loop active. Monitoring incoming sensor data...")
+        # --- CONNECTION POLLING SYNCHRONIZATION ---
+        log_system("[MAIN] Waiting for hardware devices to establish connections (BlueCoin and Speaker)...")
+        
+        connection_timeout = 60  # Maximum wait time in seconds
+        start_wait_time = time.time()
+        all_connected = False
 
-        # 7. Main execution loop (UI refresh and keyboard input polling)o
+        while (time.time() - start_wait_time) < connection_timeout:
+            # Check BlueCoin sensor threads connection status
+            sensors_ready = True
+            if sensor_manager.threads:
+                sensors_ready = all(
+                    t.node.get_status() == NodeStatus.CONNECTED for t in sensor_manager.threads
+                )
+                
+            # Check Speaker actuator threads connection status
+            actuators_ready = True
+            if actuator_manager.actuators:
+                actuators_ready = all(
+                    t.is_connected() for t in actuator_manager.actuators.values()
+                )
+                
+            # If both subsystems are fully connected, break the polling loop
+            if sensors_ready and actuators_ready:
+                all_connected = True
+                break
+                
+            time.sleep(1)
+
+        if all_connected:
+            log_system("[MAIN] Event-driven control system active. Awaiting sensor signals...")
+        else:
+            log_system("[MAIN] WARNING: Connection timeout reached. System will force-start the dashboard.", level="WARNING")
+            
+        log_system("[MAIN] System ready for drowsiness detection!")
+        # -------------------------------------------
+
+        # 7. Main Execution Loop: Update on-screen Graphical Dashboard
         while True:
-            # Renders standby screen when alert, switches to camera feed if YOLO triggers
+            # Render current state (Shows standby if driver is awake, 
+            # shows real-time video feed if YOLO activates following an event)
             dashboard.render(yolo_thread)
 
             # Exit software if 'q' is pressed on the dashboard window
@@ -130,12 +165,12 @@ def main():
     except Exception as e:
         import traceback
         log_system("="*50, level="ERROR")
-        log_system(f"[CRITICAL ERROR] Pipeline failure in main loop:", level="ERROR")
+        log_system("[CRITICAL ERROR] Blocking failure in the main executive loop:", level="ERROR")
         log_system(traceback.format_exc(), level="ERROR")
         log_system("="*50, level="ERROR")
     finally:
-        # 8. Safe hardware teardown and resource release
-        log_system("[MAIN] Initiating clean software and hardware shutdown...")
+        # 8. Safe shutdown pipeline and controlled release of all resources
+        log_system("[MAIN] Initiating hardware and software shutdown procedures...")
         
         if dispatcher:
             dispatcher.stop()
