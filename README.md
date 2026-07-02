@@ -191,6 +191,33 @@ YOLO & ResNet18 DPU Thread responsibilities:
 * Run YOLO inference on the DPU to find the person,
 * Postprocess detections via Non-Maximum Suppression (NMS),
 * Execute frontal face localization inside the person region using Haar Cascade on CPU,
-* Apply a top-40% geometric fallback crop if the face is undetected or in profile,
+* **Apply an anthropomorphic geometric fallback crop if the face is undetected:**
+  When the Haar Cascade fails to localize a face (e.g., the subject turns around or is in profile), the thread triggers a fallback heuristic designed to isolate the head-and-shoulders region based on standard body proportions. 
+  
+  The fallback region of interest (ROI) is dynamically calculated through a **two-stage geometric process**:
+
+  * **Stage 1: Dynamic Aspect-Ratio Reconstruction**
+    Instead of just cutting the top of the box, the algorithm re-centers and scales the target region using the upper body measurements:
+    1. **Height Isolation:** It isolates the top 40% height of the YOLO bounding box ($Y_{fallback} = Y_1 + (Y_2 - Y_1) \times 0.4$).
+    2. **Width Anchoring:** It finds the horizontal center of the person ($X_{center} = \frac{X_1 + X_2}{2}$).
+    3. **Proportional Scaling:** It forces a human-like proportion by calculating a custom fallback width equal to 120% of this isolated height ($W_{fallback} = H_{isolated} \times 1.2$).
+    4. **Bounding Box Creation:** This creates a structured, centered box around the head and neck area.
+
+  > 📐 **Stage 1 & 2 Geometric Evolution:**
+  > ```text
+  >  Original YOLO Box          Stage 1: Fallback ROI         Stage 2: Final DPU Input
+  > ┌─────────────────┐        ┌───────────────────┐         ┌─────────────────────────┐
+  > │                 │ ▲      │   [Head/Neck]     │ ▲       │  .....................  │
+  > │  (Isolated 40%) │ │0.4H  │ ◄── W_fallback ──►│ │0.4H   │  :  +30% Padding Context:  │
+  > ├─────────────────┤ ▼      └───────────────────┘ ▼       │  : [ResNet Inference] :  │
+  > │                 │                                      │  :...................:  │
+  > │  (Discarded 60%)│                                      └─────────────────────────┘
+  > └─────────────────┘
+  > ```
+
+  * **Stage 2: Contextual Margin Expansion (+30%)**
+    Once the raw fallback box is calculated, it is passed to `preprocess_for_resnet()`, which applies a uniform contextual expansion (`YOLO_ROI_MARGIN_X/Y = 0.30`). This expands the bounding box outward by **30%** on both axes ($X \pm 30\%$, $Y \pm 30\%$) before clamping it to the image boundaries.
+
+  * **Purpose:** This two-step geometry ensures that even if the face tracker fails, the **ResNet18** model consistently receives a perfectly framed, padded frame containing the upper torso and head, preventing classification errors caused by tight or misaligned crops.
 * Run ResNet inference on the DPU conditionally (only if a valid face or fallback region is present),
 * Store the latest person-detection status, state prediction, and bounding boxes using locks,
