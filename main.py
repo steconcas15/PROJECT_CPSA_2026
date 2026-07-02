@@ -100,11 +100,6 @@ def main():
         yolo_thread = YoloDpuThread(roi_state=roi_state)
         yolo_thread.start() # Starts in 'idle' mode, physical camera stays off for now
 
-        # 6. Configurazione della Policy reale per l'attivazione dei dispositivi di allarme
-        # Inserisci gli ID precisi dei tuoi attuatori hardware (es. led cruscotto, buzzer, speaker)
-        # attuatori_sistema = ["led_cruscotto", "speaker_allarme"]
-        # drowsiness_policy = DrowsinessActivationPolicy(actuator_ids=attuatori_sistema)
-
         # 6. Start the Orchestrator (EventDispatcher)
         # Connects IMU events with camera activation and hardware triggers
         dispatcher = EventDispatcher(
