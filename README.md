@@ -151,3 +151,9 @@ CPSA_2026/
 ├── trash.py
 └── xmutil_load_dpu.sh
 ```
+
+# Runtime Components
+## IMU Pipeline
+
+## Video Pipeline
+ 
