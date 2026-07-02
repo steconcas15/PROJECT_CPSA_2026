@@ -158,7 +158,7 @@ def main():
             unregister_dashboard_console()
             dashboard.close()
             
-        log_system("[MAIN] Tutti i moduli sono stati spenti correttamente. Risorse hardware rilasciate.")
+        log_system("[MAIN] All modules stopped. Hardware resources released.")
 
 
 if __name__ == "__main__":
