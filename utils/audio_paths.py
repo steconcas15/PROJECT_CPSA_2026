@@ -12,7 +12,7 @@ from utils.logger import log_system
 class AudioLibrary:
     _base_path = Path(__file__).resolve().parent.parent / "assets" / "audio"
     _files = {
-        "DROWSINESS_ALERT": "beep_beep.mp3", #stereotipia_pericolosa_3
+        "DROWSINESS_ALERT": "beep_beep.mp3",
         "SPEAKER_CONNECT": "speaker_connected.mp3"
     }
 
