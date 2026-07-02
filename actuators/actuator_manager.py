@@ -16,10 +16,9 @@ from utils.config import get_speaker_config
 
 class ActuatorManager:
     """
-    Manages discovery, initialization, and control of actuator devices
-    such as MetaMotion haptics and bluetooth speakers.
+    Manages discovery, initialization, and control of a bluetooth speaker actuators.
 
-    Provides a unified interface for triggering action on any actuator.
+    Provides a unified interface for triggering audio actions on connected speakers.
     """
 
     def __init__(self):
@@ -30,7 +29,7 @@ class ActuatorManager:
 
     def scan_actuators(self):
         """
-        Scan wanted (from config.yaml) actuator devices and store their addresses.
+        Scan wanted (from config.yaml) speaker devices and store their MAC addresses.
         """
         log_system("[ActuatorManager] Scanning for all actuator devices...")
         self.speaker_enable = (get_speaker_config() or {}).get("enable", True)
@@ -47,7 +46,7 @@ class ActuatorManager:
 
     def initialize_actuators(self):
         """
-        Initializes all actuator threads using previously scanned addresses.
+        Initializes speaker threads using previously scanned MAC addresses.
         """
         log_system("[ActuatorManager] Initializing all actuator devices...")
 
@@ -67,11 +66,11 @@ class ActuatorManager:
 
     def trigger(self, actuator_id: str, action_type: str, **kwargs):
         """
-        Triggers an action on the specified actuator.
+        Triggers an audio action on the specified speaker.
 
         Args:
-            actuator_id (str): ID of the actuator (e.g., 'led_192.168.1.100', 'meta_A1:B2:C3:D4:E5:F6')
-            action_type (str): Type of action to perform (currently unused, reserved for future)
+            actuator_id (str): ID of the speaker (e.g., 'speaker_A1:B2:C3:D4:E5:F6')
+            action_type (str): Type of action to perform (reserved for future use)
             **kwargs: Additional parameters for the action.
         """
         actuator = self.actuators.get(actuator_id)
@@ -99,14 +98,14 @@ class ActuatorManager:
 
     def get_actuators_ids(self):
         """
-        Returns all registered actuator IDs
-        :return:
+        Returns all registered speaker IDs.
+        :return: A list of speaker ID strings
         """
         return list(self.actuators.keys())
 
     def stop_all(self):
         """
-        Stops all actuator threads and clears the registry.
+        Stops all speaker threads and clears the registry.
         """
         log_system("[ActuatorManager] Stopping all actuator threads...")
 
