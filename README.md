@@ -156,4 +156,11 @@ CPSA_2026/
 ## IMU Pipeline
 
 ## Video Pipeline
- 
+ The current video pipeline is managed within a single background thread (YoloDpuThread) executing a three-stage hybrid cascade:
+```text
+YOLO DPU Thread:
+  ➔ Person Detection (YOLOv3 .xmodel on DPU)
+  ➔ Face Localization (Haar Cascade Classifier on CPU)
+  ➔ State Classification (ResNet18 .xmodel on DPU)
+```
+The video thread is created and started by main.py. It deserializes and loads both DPU models and then remains idle until activated by the dispatcher.
