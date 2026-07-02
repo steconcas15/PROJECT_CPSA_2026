@@ -176,9 +176,19 @@ CPSA_2026/
                       (Profile/Undetected)               4. State Classification
                              │                               (ResNet18 on DPU)
                              ▼                                   │
-                      3. Fallback Crop                           ▼
+                      3. Bounding box estimation                 ▲
                         (Top-40% of Body) ──► [ Target: Crop ] ──┘
 ```
 The video thread is created and started by main.py. It deserializes and loads both DPU models and then remains idle until activated by the dispatcher.
 
-
+## YOLO DPU Thread responsibilities:
+* load the configured YOLO and ResNet .xmodel targets,
+* create the XIR graphs and VART runners for both hardware-accelerated models,
+open the camera only while active with progressive backoff reconnection logic,
+run YOLO inference to extract multi-class object localization grids,
+postprocess detections via Non-Maximum Suppression (NMS) to isolate the target person,
+execute face localization inside the person ROI using a Frontal Haar Cascade Classifier on CPU,
+apply a dynamic geometric fallback (cropping the top-40% region of the body box) if the face is undetected or in profile,
+run inline ResNet classification on the extracted face region to detect state probabilities (DROWSY or NATURAL),
+store the latest person-detection status, state prediction, and bounding boxes under mutual exclusion locks (threading.Lock),
+store the latest annotated frame for the external dashboard.
