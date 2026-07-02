@@ -27,39 +27,37 @@ The system is organized around an IMU-first event loop. A BlueCoin device provid
 
 ```text
 BlueCoin BLE Sensors
-  │
-  ▼
-SensorManager
-  │
-  ▼
+       │
+       ▼
+ SensorManager
+       │
+       ▼
 Feature Listeners
-  │
-  ▼
-Synchronizer
-  │
-  ▼
-DataBuffer
-  │
-  ▼
+       │
+       ▼
+  Synchronizer
+       │
+       ▼
+   DataBuffer
+       │
+       ▼
 DrowsinessClassifier
-  │
-  ▼
-Event Queue
-  │
-  ▼
-EventDispatcher ────► YOLO DPU Thread (Standby / Active)
-  │                         │
-  │                         ▼
-  │                   ResNet18 Inference
-  │
-  ▼
-DrowsyAlertPolicy
-  │
-  ▼
+       │
+       ▼
+  Event Queue
+       │
+       ▼
+EventDispatcher <─────────────────────────────────┐
+       │                                          │
+       ├───> YOLO DPU Thread (Standby / Active)   │ (Video Prediction:
+       │                   │                      │  "DROWSY" / "ALERT")
+       ▼                   ▼                      │
+DrowsyAlertPolicy   ResNet18 Inference ───────────┘
+       │
+       ▼
 ActuatorManager
-  │
-  └── Bluetooth Speaker
-
+       │
+ └─► Bluetooth Speaker
 ```
 
 ### Runtime Flow
