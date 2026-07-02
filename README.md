@@ -181,14 +181,16 @@ CPSA_2026/
 ```
 The video thread is created and started by main.py. It deserializes and loads both DPU models and then remains idle until activated by the dispatcher.
 
-## YOLO DPU Thread responsibilities:
-* load the configured YOLO and ResNet .xmodel targets,
-* create the XIR graphs and VART runners for both hardware-accelerated models,
-open the camera only while active with progressive backoff reconnection logic,
-run YOLO inference to extract multi-class object localization grids,
-postprocess detections via Non-Maximum Suppression (NMS) to isolate the target person,
-execute face localization inside the person ROI using a Frontal Haar Cascade Classifier on CPU,
-apply a dynamic geometric fallback (cropping the top-40% region of the body box) if the face is undetected or in profile,
-run inline ResNet classification on the extracted face region to detect state probabilities (DROWSY or NATURAL),
-store the latest person-detection status, state prediction, and bounding boxes under mutual exclusion locks (threading.Lock),
-store the latest annotated frame for the external dashboard.
+## YOLO & ResNet18
+
+YOLO & ResNet18 DPU Thread responsibilities:
+
+* Load the configured YOLO and ResNet .xmodel targets sequentially,
+* Create the XIR graphs and VART runners for both models during thread setup,
+* Open the camera only while active with reconnection logic,
+* Run YOLO inference on the DPU to find the person,
+* Postprocess detections via Non-Maximum Suppression (NMS),
+* Execute frontal face localization inside the person region using Haar Cascade on CPU,
+* Apply a top-40% geometric fallback crop if the face is undetected or in profile,
+* Run ResNet inference on the DPU conditionally (only if a valid face or fallback region is present),
+* Store the latest person-detection status, state prediction, and bounding boxes using locks,
