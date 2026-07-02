@@ -4,21 +4,36 @@ import cv2
 import numpy as np
 import threading
 
+# Global reference to the active dashboard instance for remote console logging
 _dashboard_console = None
 
 def register_dashboard_console(dashboard):
+    """
+    Registers the active dashboard instance to the global console logging context.
+    """
     global _dashboard_console
     _dashboard_console = dashboard
 
 def unregister_dashboard_console():
+    """
+    Clears the global dashboard console reference during teardown.
+    """
     global _dashboard_console
     _dashboard_console = None
 
 def dashboard_console_log(message):
+    """
+    Pushes a log line to the dashboard UI if a valid instance is registered.
+    """
     if _dashboard_console is not None:
         _dashboard_console.add_line(message)
 
 class VideoDashboard:
+    """
+    Manages the system graphical user interface using OpenCV.
+    Displays the real-time video stream panel and an asynchronous scrolling console.
+    """
+    
     def __init__(
         self,
         window_name="CPSA Dashboard",
@@ -32,7 +47,7 @@ class VideoDashboard:
         self.height = height
         self.fullscreen = fullscreen
 
-        # Layout: Video a tutto schermo sopra, console in basso
+        # Layout allocation: Full-width video panel on top, text console at the bottom
         self.console_height = 250
         self.console_y = self.height - self.console_height
         self.video_panel_w = self.width
@@ -41,6 +56,7 @@ class VideoDashboard:
         self.console_lines = deque(maxlen=console_max_lines)
         self.console_lock = threading.Lock()
 
+        # Initialize the target OpenCV display window
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
 
         if self.fullscreen:
@@ -53,43 +69,68 @@ class VideoDashboard:
             cv2.resizeWindow(self.window_name, self.width, self.height)
 
     def add_line(self, message):
+        """
+        Appends a new line to the console queue using thread-safe synchronization.
+        """
         with self.console_lock:
             self.console_lines.append(str(message))
 
     def log(self, message):
+        """
+        Prints the message to stdout and pipes it directly into the UI console.
+        """
         print(message)
         self.add_line(message)
 
     def get_phase(self, thread):
+        """
+        Safely extracts the execution phase property from a processing thread.
+        """
         return getattr(thread, "phase", "unknown")
 
     def fit_frame(self, frame, target_w, target_h):
+        """
+        Resizes an input frame to fit target dimensions while preserving its aspect ratio.
+        Centers the image on a black canvas (letterboxing/pillarboxing).
+        """
         if frame is None:
             return np.zeros((target_h, target_w, 3), dtype=np.uint8)
         h, w = frame.shape[:2]
         if h <= 0 or w <= 0:
             return np.zeros((target_h, target_w, 3), dtype=np.uint8)
 
+        # Calculate scale factor to maintain original aspect ratio
         scale = min(target_w / w, target_h / h)
         new_w, new_h = int(w * scale), int(h * scale)
         resized = cv2.resize(frame, (new_w, new_h))
+
+        # Initialize an empty black canvas and center the resized frame
         canvas = np.zeros((target_h, target_w, 3), dtype=np.uint8)
         x, y = (target_w - new_w) // 2, (target_h - new_h) // 2
         canvas[y:y + new_h, x:x + new_w] = resized
         return canvas
 
     def get_thread_frame(self, thread, target_w, target_h):
+        """
+        Safely fetches the latest processed frame from the pipeline worker thread.
+        """
         if thread is None or not hasattr(thread, "get_latest_frame"):
             return np.zeros((target_h, target_w, 3), dtype=np.uint8)
         return self.fit_frame(thread.get_latest_frame(), target_w, target_h)
 
     def draw_panel_title(self, canvas, title, active, phase):
+        """
+        Draws the status header overlay containing component states and execution phases.
+        """
         status = "ACTIVE" if active else "IDLE"
         text = f"{title} | {status} | phase={phase}"
         cv2.rectangle(canvas, (0, 0), (self.width, 40), (30, 30, 30), -1)
         cv2.putText(canvas, text, (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
     def draw_console(self, canvas):
+        """
+        Renders the scrolling text console background block and text lines onto the canvas.
+        """
         cv2.rectangle(canvas, (0, self.console_y), (self.width, self.height), (10, 10, 10), -1)
         cv2.putText(canvas, "Console", (20, self.console_y + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         y = self.console_y + 70
@@ -100,6 +141,9 @@ class VideoDashboard:
             y += 25
 
     def render(self, yolo_thread=None):
+        """
+        Assemble all graphic buffers, frames, text elements, and pushes them to the monitor.
+        """
         dashboard = np.zeros((self.height, self.width, 3), dtype=np.uint8)
         
         # Rendering Video
@@ -118,7 +162,13 @@ class VideoDashboard:
         cv2.imshow(self.window_name, dashboard)
 
     def wait_key(self, delay_ms=1):
+        """
+        Polls for physical keyboard window interrupt keys.
+        """
         return cv2.waitKey(delay_ms) & 0xFF
 
     def close(self):
+        """
+        Destroys the underlying window context explicitly on shutdown.
+        """
         cv2.destroyWindow(self.window_name)
