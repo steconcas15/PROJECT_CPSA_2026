@@ -158,9 +158,27 @@ CPSA_2026/
 ## Video Pipeline
  The current video pipeline is managed within a single background thread (YoloDpuThread) executing a three-stage hybrid cascade:
 ```text
-YOLO DPU Thread:
-  ➔ Person Detection (YOLOv3 .xmodel on DPU)
-  ➔ Face Localization (Haar Cascade Classifier on CPU)
-  ➔ State Classification (ResNet18 .xmodel on DPU)
+[ Input Frame ]
+       │
+       ▼
+ 1. Person Detection (YOLOv3 on DPU)
+       │
+       ├──► [ Person NOT Detected ] ──► (Skip/Next Frame)
+       │
+       └──► [ Person Detected ]
+                 │
+                 ▼
+           2. Face Localization (Haar Cascade on CPU)
+                 │
+                 ├──► [ Face Found ] ───────► [ Target: Face ] ──┐
+                 │                                               │
+                 └──► [ Face NOT Found ]                         ▼
+                      (Profile/Undetected)               4. State Classification
+                             │                               (ResNet18 on DPU)
+                             ▼                                   │
+                      3. Fallback Crop                           ▼
+                        (Top-40% of Body) ──► [ Target: Crop ] ──┘
 ```
 The video thread is created and started by main.py. It deserializes and loads both DPU models and then remains idle until activated by the dispatcher.
+
+
