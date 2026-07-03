@@ -8,6 +8,10 @@
   * [Runtime Flow](#runtime-flow)
   * [Important Runtime Details](#important-runtime-details)
   * [Project Structure](#project-structure)
+* [Python Dependencies and Environment Setup](#python-dependencies-and-environment-setup)
+  * [Core Python Modules Used](#core-python-modules-used)
+  * [Installation Commands](#installation-commands)
+  * [DPU / Vitis-AI Runtime Setup](#dpu--vitis-ai-runtime-setup)
 * [Runtime Components](#runtime-components)
   * [IMU Pipeline](#imu-pipeline)
   * [Video Pipeline](#video-pipeline)
@@ -15,6 +19,8 @@
   * [Actuation Policy](#actuation-policy)
   * [Event System and Dispatcher](#event-system-and-dispatcher)
   * [Anti-Blink Filter Mechanics](#anti-blink-filter-mechanics)
+  * [Dashboard](#dashboard)
+  * [Logging](#logging)
 
 ---
 
@@ -197,6 +203,16 @@ Install the primary application dependencies in the same Python environment used
 
 ```bash
 pip install numpy pyyaml playsound bluepy blue-st-sdk dbus_fast opencv-python
+```
+
+### DPU / Vitis-AI Runtime Setup
+The machine learning video pipeline requires specialized hardware acceleration bindings to interface with the Xilinx DPU on the KV260 board:
+
+*   Proprietary Imports: The modules `import xir` and `import vart` are mandatory components of the Xilinx Vitis-AI infrastructure. These packages cannot be installed via standard PyPI and must be provided directly by the Xilinx Linux image runtime.
+*   FPGA Overlay Initialization: The DPU fabric must be programmed before starting the main Python application. Run the deployment helper script once at system startup:
+
+```bash
+bash xmutil_load_dpu.sh
 ```
 
 ---
