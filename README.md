@@ -304,4 +304,4 @@ The system implements an Anti-Blink Filter within the `EventDispatcher` pipeline
 4. Trigger Phase ($\Delta t \ge 1.0\text{s}$): If the user's eyes remain closed and the `DROWSY` status persists continuously for 1.0 second or longer, the state is validated as an actual microsleep anomaly. The dispatcher passes the raw `DROWSY` status to `DrowsyAlertPolicy.handle()`, which checks the 5-second per-speaker cooldown and activates the speaker sounds.
  
 #### State Reset Conditions
-* The moment the video pipeline returns a `NATURAL` prediction, the `self.\_drowsy\_since\_ts` timestamp is immediately reset to `None`, clearing the window for the next event.
+* The moment the video pipeline returns a `NATURAL` prediction, the `self._drowsy_since_ts` timestamp is immediately reset to `None`, clearing the window for the next event.
