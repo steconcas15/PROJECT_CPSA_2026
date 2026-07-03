@@ -12,6 +12,8 @@
   * [Core Python Modules Used](#core-python-modules-used)
   * [Installation Commands](#installation-commands)
   * [DPU / Vitis-AI Runtime Setup](#dpu--vitis-ai-runtime-setup)
+  * [Configuration](#configuration)
+  * [Run Procedure](#run-procedure)
 * [Runtime Components](#runtime-components)
   * [IMU Pipeline](#imu-pipeline)
   * [Video Pipeline](#video-pipeline)
