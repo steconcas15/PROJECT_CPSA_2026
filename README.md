@@ -320,3 +320,23 @@ The dashboard manages the main graphical user interface using OpenCV, combining 
 #### Crucial GUI Rules
 *   Centralized Rendering: The dashboard owns the window context and handles all rendering operations.
 *   System Exit: Pressing `q` inside the window terminates the application cleanly.
+
+### Logging
+The system includes a centralized logging infrastructure to track the application's runtime behavior and sensor transitions.
+
+#### Features and Data Tracked
+*   **Monitored Operations**: The pipeline records system operations, event queue updates, physical actuation details, and raw console outputs.
+*   **File Export**: Log archives are automatically saved to disk using an organized folder structure located under the directory path defined by `log_base_path`.
+
+---
+
+#### Configuration Variables
+All main logging behaviors are controlled directly inside `config.yaml` using the following properties:
+
+```yaml
+enable_system_log: true
+enable_actuation_detail: false
+debug_system_console: true
+debug_event_console: true
+log_base_path: "~/Desktop/CPSA_logs"
+```
