@@ -13,6 +13,7 @@
   * [IMU Pipeline](#imu-pipeline)
   * [Video Pipeline](#video-pipeline)
   * [YOLO & ResNet18](#yolo--resnet18)
+  * [Actuation Policy](#actuation-policy)
 
 ## System View
 
@@ -238,3 +239,5 @@ YOLO & ResNet18 DPU Thread responsibilities:
 
 * **Save results safely using Thread Locks:**
   While the background thread runs at maximum speed capturing and analyzing frames, it continuously updates the system status (whether a person is found, their box coordinates, and the drowsiness prediction). To prevent data corruption or memory conflicts with the main program trying to read these values at the same time, all shared variables are securely protected using mutual exclusion "locks".
+
+### Actuation Policy
