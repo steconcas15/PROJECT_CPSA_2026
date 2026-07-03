@@ -1,7 +1,7 @@
 """
 =============================================================================
  DataBuffer — Sliding Window Buffer for Real-Time IMU Streaming
- Source  : IMUSynchronizer (single device, bc_right)
+ Source  : IMUSynchronizer (single device, bc_left)
  Sink    : DrowsinessClassifier.recognize()
 =============================================================================
 
@@ -125,8 +125,8 @@ class DataBuffer:
         incoming BLE callbacks for the duration of the classifier's execution.
 
         Args:
-            R_acc    : (ax, ay, az) from the right BlueCoin, in mg
-            R_gyr    : (gx, gy, gz) from the right BlueCoin, in dps
+            R_acc    : (ax, ay, az) from the left BlueCoin, in mg
+            R_gyr    : (gx, gy, gz) from the left BlueCoin, in dps
             ts_emit  : monotonic timestamp of this sample [s]
         """
         window_rows = None
