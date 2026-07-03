@@ -242,21 +242,20 @@ YOLO & ResNet18 DPU Thread responsibilities:
 
 ### Actuation Policy
 
-### Actuation Policy and Actuator Layer
+`DrowsyAlertPolicy` decides when to trigger audio alarms based on drowsiness detection and speaker cooldown limits.
 
-`DrowsyAlertPolicy` converts driver status evaluation and video prediction events into explicit hardware audio commands, while `ActuatorManager` handles the lifecycle and execution abstraction of the Bluetooth hardware.
+The policy tracks:
+* **actuator_ids**: list of actuator IDs, filtering only the ones that start with `speaker_`.
+* **_audio_file**: the actual file path checked on disk using `AudioLibrary.DROWSINESS_ALERT`.
+* **_spk_cooldown_sec**: a cooldown period set to 5 seconds.
+* **_spk_last_fire_time**: a dictionary mapping each speaker ID to its last activation timestamp using monotonic time.
 
-#### The policy tracks:
-* **Target Speaker Identity:** Retains exclusively the system IDs designated as active speaker instances (`speaker_<MAC>`).
-* **Disk Asset Validation:** Verifies the physical presence of the target `.mp3` alert file path from the centralized `AudioLibrary` at boot.
-* **Per-Speaker Cooldown Status:** Maps each speaker's ID to its last activation timestamp using monotonic time loops to prevent concurrent audio flooding or overlapping.
-
-#### Configuration (config.yaml):
+Configuration:
 ```yaml
 speaker:
   enable: true
-  mac: "00:11:22:33:44:55"          # Optional fixed MAC address bypass
-  scan_timeout: 5                   # Bluetooth discovery duration
-  fast_retry_attempts: 5            # Quick reconnection loop attempts
-  retry_interval: 5                 # Seconds between fast retries
-  retry_sleep: 60                   # Delay before falling back to background retry cycles
+  mac: "XX:XX:XX:XX:XX:XX"
+  scan_timeout: 5
+  fast_retry_attempts: 5
+  retry_interval: 5
+  retry_sleep: 60
