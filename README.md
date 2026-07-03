@@ -12,7 +12,7 @@
 * [Runtime Components](#runtime-components)
   * [IMU Pipeline](#imu-pipeline)
   * [Video Pipeline](#video-pipeline)
-  * [YOLO & ResNet18](#yolo-&-resnet18)
+  * [YOLO & ResNet18](#yolo--resnet18)
 
 ## System View
 
