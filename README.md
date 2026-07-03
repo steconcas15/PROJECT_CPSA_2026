@@ -225,53 +225,48 @@ config.yaml
 Current configuration areas:
 
 ```yaml
-# config.yaml
-# Configuration file for the system
-# Can choose logs folder, log details activation, enabled actuators, buffering parameters
-#
-# Author: Stefano Concas
-# Github: https://github.com/steconcas15
-# Repository: https://github.com/steconcas15/PROJECT_CPSA_2026
-# License: MIT
 
-# ---- LOGS & DEBUG CONFIGURATION ----
-log_base_path: ~/Desktop/CPSA_logs  # Path where logs are saved. User folder is automatically detected
+log_base_path: ~/Desktop/CPSA_logs 
 
-enable_system_log: true      # Create/Log system status messages
-enable_actuation_detail: false  # Log actuation used for that event
+enable_system_log: true  
+enable_actuation_detail: false  
 
-debug_system_console: true   # Choose to print system events on the console
-debug_event_console: true    # Choose to print events on the console
+debug_system_console: true  
+debug_event_console: true   
 
-# ---- DPU MODELS PATHS ----
-yolo_model_name: "/home/ubuntu/Desktop/PROJECT_CPSA_2026/Video_Pipeline/Yolo_v3/pynqdpu.tf_yolov3_voc.DPUCZDX8G_ISA1_B4096.2.5.0.xmodel"
-resnet_model_name: "/home/ubuntu/Desktop/PROJECT_CPSA_2026/Video_Pipeline/Resnet18/kv260_train_resnet18_drowsy.xmodel"
+yolo_model_name: "/home/ubuntu/Desktop/PROJECT_CPSA_2026/Video_Pipeline/Yolo_v3/yolo_v3.xmodel"
+resnet_model_name: "/home/ubuntu/Desktop/PROJECT_CPSA_2026/Video_Pipeline/Resnet18/resnet18.xmodel"
 
-# ---- SENSORS AND ACTUATORS CONFIGS ----
 bluecoins:
   - id: bc_left
     name: "CPSA_L2"
 
 speaker:
-  mac: D4:8C:49:C9:DC:9A      # Device MAC address
-  enable: true                # Device activation flag
-  scan_timeout: 5             # First scan duration in seconds
-  fast_retry_attempts: 5      # Number of fast retries after a disconnection
-  retry_interval: 10          # Wait time between fast retries
-  retry_sleep: 60             # Wait time between subsequent retries
+  mac: D4:8C:49:C9:DC:9A   
+  enable: true             
+  scan_timeout: 5          
+  fast_retry_attempts: 5      
+  retry_interval: 10          
+  retry_sleep: 60
 
-# Sensors data stream parameters for sync
 sync:
-  max_skew_ms: 30         # Timing alignment tolerance
-  stale_ms: 50           # Drops sets of data if sitting too long
+  max_skew_ms: 30        
+  stale_ms: 50          
 
 buffer:
-  window_size: 150                        # Samples per window
-  overlap: 75                             # Overlap 50% -> 75 samples step
-  debug_print_buffer: false               # Prints buffer content
-  debug_print_features: false              # Prints feature vector
+  window_size: 150                        
+  overlap: 75                            
+  debug_print_buffer: false               
+  debug_print_features: false              
 
 event_queue_size: 1
+```
+
+### Run Procedure
+Load the DPU firmware/overlay first, then run the Python entry point directly:
+```bash
+bash xmutil_load_dpu.sh
+python3 main.py
 ```
 
 ---
