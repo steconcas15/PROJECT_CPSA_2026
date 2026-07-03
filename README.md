@@ -1,6 +1,5 @@
 # Cyber-Physical-Systems for Real-Time Driver Drowsiness Detection and Road Safety
 
-
 ## Table of Contents
 
 * [System View](#system-view)
@@ -14,6 +13,8 @@
   * [Video Pipeline](#video-pipeline)
   * [YOLO & ResNet18](#yolo--resnet18)
   * [Actuation Policy](#actuation-policy)
+  * [Event System and Dispatcher](#event-system-and-dispatcher)
+  * [Anti-Blink Filter Mechanics](#anti-blink-filter-mechanics)
 
 ## System View
 
@@ -260,6 +261,7 @@ speaker:
   retry_interval: 5
   retry_sleep: 60
 ```
+
 ### Event System and Dispatcher
 The event queue is shared across runtime components and consumed by the dispatcher.
 
