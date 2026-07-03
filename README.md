@@ -86,9 +86,9 @@ ActuatorManager
 7. Read discovered actuator ID from the ActuatorManager.
 8. Initialize and start sensor thread.
 9. Create PersonRoiState.
-10. Create YoloDpuThread (passing the roi_state).
+10. Create YoloDpuThread (passing the roi\_state).
 11. Create DrowsyAlertPolicy using the discovered actuator ID.
-12. Create EventDispatcher with actuator manager, policy, YOLO thread, and roi_state.
+12. Create EventDispatcher with actuator manager, policy, YOLO thread, and roi\_state.
 13. Start the EventDispatcher thread.
 14. Enter the main dashboard render loop.
 15. Loop until 'q' is pressed in the GUI or a KeyboardInterrupt (Ctrl+C) is received.
@@ -97,7 +97,7 @@ ActuatorManager
 
 ### Important Runtime Details
 
-* The DPU overlay must be loaded before `main.py` starts. Use `bash xmutil_load_dpu.sh` at system startup to program the FPGA fabric on the KV260 board.
+* The DPU overlay must be loaded before `main.py` starts. Use `bash xmutil\_load\_dpu.sh` at system startup to program the FPGA fabric on the KV260 board.
 * `main.py` is the direct runtime entry point.
 * The `YoloDpuThread` is started at boot but stays idle, keeping the physical camera interface suspended until the `EventDispatcher` activates it upon event detection.
 * The `VideoDashboard` is responsible for the main execution loop, rendering frames and reading GUI key inputs (e.g., pressing `'q'` to gracefully terminate).
@@ -198,31 +198,31 @@ The video thread is created and started by main.py. It deserializes and loads bo
 
 YOLO & ResNet18 DPU Thread responsibilities:
 
-* **Load YOLO & ResNet18 models sequentially:**
+* Load YOLO & ResNet18 models sequentially:
   During startup, the system reads the pre-trained and compiled AI model files (the `.xmodel` files for YOLOv3 and ResNet18). It loads them into system memory one after the other to prepare them for execution.
 
-* **Set up hardware acceleration (DPU):**
+* Set up hardware acceleration (DPU):
   During the initial setup phase, the code creates XIR graphs and VART runners for both models. It configures the specialized hardware (the physical Xilinx DPU chip) to create a fast track for running the heavy mathematical calculations of YOLO and ResNet at maximum speed.
 
-* **Manage the camera with smart retry logic:**
+* Manage the camera with smart retry logic:
   The camera stream is opened only when the thread is actively processing. If the camera loses connection or fails to respond, the code doesn’t crash: it applies an automatic reconnection loop that makes up to 5 consecutive attempts with a short delay between each to give the hardware device time to reset.
 
-* **Find the person using YOLOv3 on the DPU chip:**
+* Find the person using YOLOv3 on the DPU chip:
   The system captures a frame from the camera and passes it directly to the YOLOv3 model running on the DPU hardware accelerator. YOLO scans the image in real time to locate any human figure and draws a bounding box around them.
 
-* **Clean up duplicate boxes (NMS):**
+* Clean up duplicate boxes (NMS):
   Object detection algorithms often find the same person multiple times, creating several overlapping boxes. The code uses a standard technique called *Non-Maximum Suppression* (NMS) to clean this up: it removes the duplicate boxes and keeps only the single most accurate rectangle with the highest confidence score.
 
-* **Locate the face using the CPU:**
+* Locate the face using the CPU:
   Once the person's bounding box is isolated, the system runs a traditional face detection algorithm (Haar Cascade) on the main CPU. This script analyzes the area inside the person's box to specifically look for facial features (eyes, nose, mouth) in a frontal position.
 
-* **Apply a smart geometric fallback crop if the face is undetected:**
+* Apply a smart geometric fallback crop if the face is undetected:
   If the software fails to find a face (for example, if the subject turns around, is in profile, or the lighting changes), a backup geometric plan triggers automatically based on standard human body proportions. This process happens in two clear stages:
   
-  * **Stage 1 (Reconstruction):** It isolates only the top 40% height of the person's body box (where the head and shoulders are expected to be), calculates the exact horizontal center, and forces a custom width equal to 120% of that isolated height to create a perfectly proportioned box around the head and neck.
-  * **Stage 2 (Margin Expansion):** This newly calculated box is then expanded outward by 30% on all sides. This acts like "zooming out" slightly to include surrounding context (like hair, ears, or clothing), which helps the secondary AI model understand the image better.
+  * Stage 1 (Reconstruction): It isolates only the top 40% height of the person's body box (where the head and shoulders are expected to be), calculates the exact horizontal center, and forces a custom width equal to 120% of that isolated height to create a perfectly proportioned box around the head and neck.
+  * Stage 2 (Margin Expansion): This newly calculated box is then expanded outward by 30% on all sides. This acts like "zooming out" slightly to include surrounding context (like hair, ears, or clothing), which helps the secondary AI model understand the image better.
 
-  > **Visual Breakdown of the Fallback Strategy:**
+  > Visual Breakdown of the Fallback Strategy:
   > ```text
   >    Original YOLO Box             Stage 1: Estimated ROI       Stage 2: Final DPU Input
   > ┌─────────────────────┐        ┌───────────────────────┐     ┌────────────────────────────┐
@@ -234,10 +234,10 @@ YOLO & ResNet18 DPU Thread responsibilities:
   > └─────────────────────┘
   > ```
 
-* **Run the state classifier (ResNet18) conditionally:**
+* Run the state classifier (ResNet18) conditionally:
   The secondary AI model (ResNet18) runs on the DPU chip only when necessary. If YOLO detects no people in the room, ResNet is completely skipped to save power consumption. If a person is present (with either a detected face or an estimated fallback region), ResNet processes that specific crop to classify whether the subject is alert (*NATURAL*) or showing signs of fatigue (*DROWSY*).
 
-* **Save results safely using Thread Locks:**
+* Save results safely using Thread Locks:
   While the background thread runs at maximum speed capturing and analyzing frames, it continuously updates the system status (whether a person is found, their box coordinates, and the drowsiness prediction). To prevent data corruption or memory conflicts with the main program trying to read these values at the same time, all shared variables are securely protected using mutual exclusion "locks".
 
 ### Actuation Policy
@@ -245,10 +245,10 @@ YOLO & ResNet18 DPU Thread responsibilities:
 `DrowsyAlertPolicy` decides when to trigger audio alarms based on drowsiness detection and speaker cooldown limits.
 
 The policy tracks:
-* **actuator_ids**: list of actuator IDs, filtering only the ones that start with `speaker_`.
-* **_audio_file**: the actual file path checked on disk using `AudioLibrary.DROWSINESS_ALERT`.
-* **_spk_cooldown_sec**: a cooldown period set to 5 seconds.
-* **_spk_last_fire_time**: a dictionary mapping each speaker ID to its last activation timestamp using monotonic time.
+* actuator_ids: list of actuator IDs, filtering only the ones that start with `speaker_`.
+* _audio_file: the actual file path checked on disk using `AudioLibrary.DROWSINESS_ALERT`.
+* _spk_cooldown_sec: a cooldown period set to 5 seconds.
+* _spk_last_fire_time: a dictionary mapping each speaker ID to its last activation timestamp using monotonic time.
 
 Configuration:
 ```yaml
@@ -264,47 +264,44 @@ speaker:
 The event queue is shared across runtime components and consumed by the dispatcher.
 
 #### Queue Configuration
-*   **`event_queue_size`**: Managed asynchronously via a shared `get_event_queue()` mechanism. The thread uses a 0.5-second polling timeout to handle idle states, check internal resource timers, and process continuous video-only policies when no new sensor data arrives.
+*   `event_queue_size`: Managed asynchronously via a shared `get_event_queue()` mechanism. The thread uses a 0.5-second polling timeout to handle idle states, check internal resource timers, and process continuous video-only policies when no new sensor data arrives.
 
 #### Classification Mapping
 The dispatcher translates numerical sensor tags (e.g., from an IMU) into human-readable labels:
-*   `0` -> **`SVEGLIO_OK`**
-*   `1` -> **`SLOW_DRIFT`**
-*   `3` -> **`SUDDEN_DROP`**
+*   `0` -> `SVEGLIO_OK`
+*   `1` -> `SLOW_DRIFT`
+*   `3` -> `SUDDEN_DROP`
 
 ---
 
 #### Video-Stage Behavior
 The dispatcher dynamically controls the execution of the video pipeline (YOLO/ResNet) to optimize processing resources and maintain battery life:
-*   **Trigger Rules**: If an anomalous IMU sensor tag is encountered (`1: SLOW_DRIFT` or `3: SUDDEN_DROP`), the video thread is immediately initialized/activated.
-*   **`NATURAL` State Auto-Off Countdown**: If the active video model pipeline predicts a stable `NATURAL` state continuously for `AWAKE_OFF_DELAY_SEC` (set to **5.0 seconds**), the video pipeline is turned off automatically to conserve resources.
-*   **Anti-Blink Suppression Filter**: When a `DROWSY` state is predicted by the video module, the system ensures a continuous duration threshold of less than 1.0 second is treated as a blink. This prevents brief eye blinks from accidentally resetting the camera shutdown timer and suppresses short false positives.
+*   Trigger Rules: If an anomalous IMU sensor tag is encountered (`1: SLOW_DRIFT` or `3: SUDDEN_DROP`), the video thread is immediately initialized/activated.
+*   `NATURAL` State Auto-Off Countdown: If the active video model pipeline predicts a stable `NATURAL` state continuously for `AWAKE_OFF_DELAY_SEC` (set to 5.0 seconds), the video pipeline is turned off automatically to conserve resources.
+*   Anti-Blink Suppression Filter: When a `DROWSY` state is predicted by the video module, the system ensures a continuous duration threshold of less than 1.0 second is treated as a blink. This prevents brief eye blinks from accidentally resetting the camera shutdown timer and suppresses short false positives.
 
 ---
 
 #### Actuation & Cooldown Behavior
-*   **Trigger Priorities**:
+*   Trigger Priorities:
     *   *Video Off*: The system relies on sensor anomalies (`1` or `3`) to trigger the policy.
     *   *Video On*: The dispatcher ignores raw sensor tags entirely. Policy evaluations are dictated exclusively by active AI video prediction states.
-*   **Audio-Alarm Anti-Blink Filter**: If the video module yields a `DROWSY` prediction but the condition has persisted for less than 1.0 continuous second, the state is temporarily overridden to `None` to prevent an accidental speaker alarm from playing.
-*   **Rate Limiting**: Consecutive policies are restricted by an `ACTUATION_COOLDOWN` window (currently **5 seconds**) before another physical trigger can occur.
+*   Audio-Alarm Anti-Blink Filter: If the video module yields a `DROWSY` prediction but the condition has persisted for less than 1.0 continuous second, the state is temporarily overridden to `None` to prevent an accidental speaker alarm from playing.
+*   Rate Limiting: Consecutive policies are restricted by an `ACTUATION\_COOLDOWN` window (currently 5 seconds) before another physical trigger can occur.
 
 ---
 
-#### Runtime Call Chain
-System state assessments flow sequentially along the following execution path:
-
-### Deep Dive: Anti-Blink Filter Mechanics
+### Anti-Blink Filter Mechanics
  
-The system implements an **Anti-Blink Filter** within the `EventDispatcher` pipeline to distinguish between a normal human eye blink and a sleep event. This prevents false positives and unnecessary audio flooding.
+The system implements an Anti-Blink Filter within the `EventDispatcher` pipeline to distinguish between a normal human eye blink and a sleep event. This prevents false positives and unnecessary audio flooding.
  
 #### Timing Thresholds
-1. **State Interception**: When the computer vision model (YOLO/ResNet) outputs a `DROWSY` prediction, the `EventDispatcher` immediately captures the event inside `_process_policy_for_event`.
-2. **Monotonic Tracking**: The dispatcher initiates a duration window tracking mechanism:
-   * If `self._drowsy_since_ts` is empty (`None`), it locks the current time using `time.monotonic()`.
+1. State Interception: When the computer vision model (YOLO/ResNet) outputs a `DROWSY` prediction, the `EventDispatcher` immediately captures the event inside `\_process\_policy\_for\_event`.
+2. Monotonic Tracking: The dispatcher initiates a duration window tracking mechanism:
+   * If `self.\_drowsy\_since\_ts` is empty (`None`), it locks the current time using `time.monotonic()`.
    * On subsequent frames, it calculates the delta: $\Delta t = \text{now} - \text{self.\_drowsy\_since\_ts}$.
-3. **Suppression Phase ($\Delta t < 1.0\text{s}$)**: If the continuous duration of the `DROWSY` state is less than 1.0 second, the system flags the behavior as a standard eye blink.
-4. **Trigger Phase ($\Delta t \ge 1.0\text{s}$)**: If the user's eyes remain closed and the `DROWSY` status persists continuously for 1.0 second or longer, the state is validated as an actual microsleep anomaly. The dispatcher passes the raw `DROWSY` status to `DrowsyAlertPolicy.handle()`, which checks the 5-second per-speaker cooldown and activates the speaker sounds.
+3. Suppression Phase ($\Delta t < 1.0\text{s}$): If the continuous duration of the `DROWSY` state is less than 1.0 second, the system flags the behavior as a standard eye blink.
+4. Trigger Phase ($\Delta t \ge 1.0\text{s}$): If the user's eyes remain closed and the `DROWSY` status persists continuously for 1.0 second or longer, the state is validated as an actual microsleep anomaly. The dispatcher passes the raw `DROWSY` status to `DrowsyAlertPolicy.handle()`, which checks the 5-second per-speaker cooldown and activates the speaker sounds.
  
 #### State Reset Conditions
-* The moment the video pipeline returns a `NATURAL` prediction, the `self._drowsy_since_ts` timestamp is immediately reset to `None`, clearing the window for the next event.
+* The moment the video pipeline returns a `NATURAL` prediction, the `self.\_drowsy\_since\_ts` timestamp is immediately reset to `None`, clearing the window for the next event.
