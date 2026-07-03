@@ -1,6 +1,16 @@
 # Cyber-Physical-Systems for Real-Time Driver Drowsiness Detection and Road Safety
 
-### System View
+
+## Table of Contents
+
+* [System View](#system-view)
+* [Architecture and Working Principle](#architecture-and-working-principle)
+  * [Architecture](#architecture)
+  * [Runtime Flow](#runtime-flow)
+  * [Important Runtime Details](#important-runtime-details)
+  * [Project Structure](#project-structure)
+
+## System View
 
 * BLE BlueCoin acquisition for driver monitoring.
 * Accelerometer and gyroscope used to detect involuntary head falls.
@@ -19,7 +29,7 @@
 * Drowsiness alert policy with feedback deployment based on active actuator ID.
 * Centralized shutdown of dispatcher, video threads, sensors, actuators, and dashboard resources
 
-### Architecture and Working Principle
+## Architecture and Working Principle
 
 The system is organized around an IMU-first event loop. A BlueCoin device provides motion data to monitor driver state. The classifier produces drowsiness tags. The dispatcher consumes the latest tag, turns on video stage if needed, and asks the actuation policy to select feedback behavior. The dashboard owns video rendering and termination input.
 
