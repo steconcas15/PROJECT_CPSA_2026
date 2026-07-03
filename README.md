@@ -9,6 +9,10 @@
   * [Runtime Flow](#runtime-flow)
   * [Important Runtime Details](#important-runtime-details)
   * [Project Structure](#project-structure)
+* [Runtime Components](#runtime-components)
+  * [IMU Pipeline](#imu-pipeline)
+  * [Video Pipeline](#video-pipeline)
+  * [YOLO & ResNet18](#yolo-&-resnet18)
 
 ## System View
 
@@ -160,10 +164,10 @@ CPSA_2026/
 └── xmutil_load_dpu.sh
 ```
 
-# Runtime Components
-## IMU Pipeline
+## Runtime Components
+### IMU Pipeline
 
-## Video Pipeline
+### Video Pipeline
  The current video pipeline is managed within a single background thread (YoloDpuThread) executing a three-stage hybrid cascade:
 ```text
 [ Input Frame ]
@@ -189,7 +193,7 @@ CPSA_2026/
 ```
 The video thread is created and started by main.py. It deserializes and loads both DPU models and then remains idle until activated by the dispatcher.
 
-## YOLO & ResNet18
+### YOLO & ResNet18
 
 YOLO & ResNet18 DPU Thread responsibilities:
 
