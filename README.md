@@ -180,6 +180,27 @@ CPSA_2026/
 
 ---
 
+## Python Dependencies and Environment Setup
+The system relies on a mix of standard Python utilities, specialized hardware acceleration bindings, and wireless communication packages.
+
+### Core Python Modules Used
+The following libraries are imported across the system architecture and must be available in the execution environment:
+*   System & Utilities: `os`, `sys`, `time`, `math`, `uuid`, `typing`, `datetime`, `pathlib`, `yaml` (via `pyyaml`), `collections` (such as `deque`).
+*   Concurrency & Communication: `threading`, `queue`, `asyncio`.
+*   Wireless & Hardware Interfaces: `bluepy`, `blue_st_sdk`, `dbus_fast`.
+*   Data Processing, Vision & Audio: `numpy`, `cv2` (OpenCV), `playsound`.
+
+---
+
+### Installation Commands
+Install the primary application dependencies into your target Python environment using `pip`:
+
+```bash
+pip install numpy pyyaml playsound bluepy blue-st-sdk dbus_fast opencv-python
+```
+
+---
+
 ## Runtime Components
 ### IMU Pipeline
 
@@ -345,8 +366,8 @@ The dashboard manages the main graphical user interface using OpenCV, combining 
 The system includes a centralized logging infrastructure to track the application's runtime behavior and sensor transitions.
 
 #### Features and Data Tracked
-*   **Monitored Operations**: The pipeline records system operations, event queue updates, physical actuation details, and raw console outputs.
-*   **File Export**: Log archives are automatically saved to disk using an organized folder structure located under the directory path defined by `log_base_path`.
+*   Monitored Operations: The pipeline records system operations, event queue updates, physical actuation details, and raw console outputs.
+*   File Export: Log archives are automatically saved to disk using an organized folder structure located under the directory path defined by `log_base_path`.
 
 #### Configuration Variables
 All main logging behaviors are controlled directly inside `config.yaml` using the following properties:
