@@ -312,7 +312,7 @@ The system implements an Anti-Blink Filter within the `EventDispatcher` pipeline
 The dashboard manages the main graphical user interface using OpenCV, combining the live camera stream and system logs into a single window.
 
 #### Layout and Features
-*   Split Display: The interface features a top video panel that preserves the original aspect ratio of the stream and a bottom text console that scrolls through system logs asynchronously.
+*   Split Display: The interface features a top video panel that shows the camera feed and a bottom text console that scrolls through system logs.
 *   Thread Status: The top header bar reads variables directly from the `YoloDpuThread` to show whether the vision pipeline is currently `ACTIVE` or `IDLE`, along with its current processing phase.
 
 ---
