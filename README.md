@@ -241,3 +241,22 @@ YOLO & ResNet18 DPU Thread responsibilities:
   While the background thread runs at maximum speed capturing and analyzing frames, it continuously updates the system status (whether a person is found, their box coordinates, and the drowsiness prediction). To prevent data corruption or memory conflicts with the main program trying to read these values at the same time, all shared variables are securely protected using mutual exclusion "locks".
 
 ### Actuation Policy
+
+### Actuation Policy and Actuator Layer
+
+`DrowsyAlertPolicy` converts driver status evaluation and video prediction events into explicit hardware audio commands, while `ActuatorManager` handles the lifecycle and execution abstraction of the Bluetooth hardware.
+
+#### The policy tracks:
+* **Target Speaker Identity:** Retains exclusively the system IDs designated as active speaker instances (`speaker_<MAC>`).
+* **Disk Asset Validation:** Verifies the physical presence of the target `.mp3` alert file path from the centralized `AudioLibrary` at boot.
+* **Per-Speaker Cooldown Status:** Maps each speaker's ID to its last activation timestamp using monotonic time loops to prevent concurrent audio flooding or overlapping.
+
+#### Configuration (config.yaml):
+```yaml
+speaker:
+  enable: true
+  mac: "00:11:22:33:44:55"          # Optional fixed MAC address bypass
+  scan_timeout: 5                   # Bluetooth discovery duration
+  fast_retry_attempts: 5            # Quick reconnection loop attempts
+  retry_interval: 5                 # Seconds between fast retries
+  retry_sleep: 60                   # Delay before falling back to background retry cycles
