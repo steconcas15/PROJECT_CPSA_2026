@@ -193,7 +193,7 @@ The following libraries are imported across the system architecture and must be 
 ---
 
 ### Installation Commands
-Install the primary application dependencies into your target Python environment using `pip`:
+Install the primary application dependencies in the same Python environment used to run `main.py`:
 
 ```bash
 pip install numpy pyyaml playsound bluepy blue-st-sdk dbus_fast opencv-python
