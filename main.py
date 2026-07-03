@@ -18,6 +18,7 @@ from core.actuation_policy import DrowsyAlertPolicy
 # Classification and data collection from STMicroelectronics BlueCoin IMU nodes
 from IMU_pipeline.classifiers.drowsiness_classifier import DrowsinessClassifier
 from sensors.sensor_manager import SensorManager
+from blue_st_sdk.node import NodeStatus
 
 # Centralized system managers
 from actuators.actuator_manager import ActuatorManager  
