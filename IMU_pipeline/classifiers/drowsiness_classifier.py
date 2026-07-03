@@ -1,7 +1,7 @@
 """
 =============================================================================
  DrowsinessClassifier — Real-Time Drowsiness Detection
- Sensor  : STM BlueCoin CPSA_L2 (LSM6DSM), single right device
+ Sensor  : STM BlueCoin CPSA_L2 (LSM6DSM), single left device
  Platform: Kria KV260 / Ubuntu 22.04
 =============================================================================
 
@@ -28,7 +28,7 @@
    id            : uuid hex string
    timestamp     : ISO wall-clock string (for logging only)
    window_ts     : float, monotonic timestamp of last sample in window
-   source        : "bc_right"
+   source        : "bc_left"
    features      : [theta_last, omega_last]  — last sample of the window
    drowsiness_tag: str "0" | "1" | "3"
 
@@ -149,7 +149,7 @@ class DrowsinessClassifier:
     so no internal locking is required.
     """
 
-    def __init__(self, source: str = "bc_right"):
+    def __init__(self, source: str = "bc_left"):
         self.source = source
 
         # Global queue shared with EventDispatcher — same instance, not a copy
