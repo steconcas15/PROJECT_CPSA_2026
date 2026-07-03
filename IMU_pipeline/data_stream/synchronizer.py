@@ -1,8 +1,6 @@
 # imu_pipeline/data_stream/synchronizer.py
 # Collects asynchronous data from a single Bluecoin device (accelerometer and gyroscope) 
 # and emits atomically aggregated 6-axis rows immediately to the data buffer.
-#
-# Adapted for Drowsiness Detection Pipeline - cpsa_2026
 
 import threading
 from dataclasses import dataclass
