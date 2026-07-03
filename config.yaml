@@ -22,7 +22,7 @@ resnet_model_name: "/home/ubuntu/Desktop/PROJECT_CPSA_2026/Video_Pipeline/Resnet
 
 # ---- SENSORS AND ACTUATORS CONFIGS ----
 bluecoins:
-  - id: bc_right
+  - id: bc_left
     name: "CPSA_L2"
 
 speaker:
