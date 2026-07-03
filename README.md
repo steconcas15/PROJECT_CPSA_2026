@@ -20,7 +20,7 @@
   * [YOLO & ResNet18](#yolo--resnet18)
   * [Actuation Policy](#actuation-policy)
   * [Event System and Dispatcher](#event-system-and-dispatcher)
-  * [Anti-Blink Filter Mechanics](#anti-blink-filter-mechanics)
+  * [Anti-Blink Filter Mechanism](#anti-blink-filter-mechanism)
   * [Dashboard](#dashboard)
   * [Logging](#logging)
 
@@ -404,7 +404,7 @@ The dispatcher dynamically controls the execution of the video pipeline (YOLO/Re
 
 ---
 
-### Anti-Blink Filter Mechanics
+### Anti-Blink Filter Mechanism
  
 The system implements an Anti-Blink Filter within the `EventDispatcher` pipeline to distinguish between a normal human eye blink and a sleep event. This prevents false positives and unnecessary audio flooding.
  
