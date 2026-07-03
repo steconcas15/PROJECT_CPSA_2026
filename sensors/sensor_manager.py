@@ -72,7 +72,7 @@ class SensorManager:
             log_system(f"[SensorManager] Missing expected right bluecoin device: '{right_name}'", level="ERROR")
             return
 
-        # Setup del solo sensore destro
+        # Right-side BLueCoin setup
         sensor_id = "bc_right"
         expected_name = right_name
         node = by_name[expected_name]
