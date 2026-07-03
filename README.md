@@ -16,6 +16,8 @@
   * [Event System and Dispatcher](#event-system-and-dispatcher)
   * [Anti-Blink Filter Mechanics](#anti-blink-filter-mechanics)
 
+---
+
 ## System View
 
 * BLE BlueCoin acquisition for driver monitoring.
@@ -35,9 +37,13 @@
 * Drowsiness alert policy with feedback deployment based on active actuator ID.
 * Centralized shutdown of dispatcher, video threads, sensors, actuators, and dashboard resources
 
+---
+
 ## Architecture and Working Principle
 
 The system is organized around an IMU-first event loop. A BlueCoin device provides motion data to monitor driver state. The classifier produces drowsiness tags. The dispatcher consumes the latest tag, turns on video stage if needed, and asks the actuation policy to select feedback behavior. The dashboard owns video rendering and termination input.
+
+---
 
 ### Architecture
 
@@ -76,6 +82,8 @@ ActuatorManager
  └─► Bluetooth Speaker
 ```
 
+---
+
 ### Runtime Flow
 ```text
 1. Create the VideoDashboard and register the dashboard console.
@@ -96,6 +104,8 @@ ActuatorManager
 16. Cleanly stop dispatcher, sensor manager, actuator manager, video thread, and unregister dashboard resources.
 ```
 
+---
+
 ### Important Runtime Details
 
 * The DPU overlay must be loaded before `main.py` starts. Use `bash xmutil\_load\_dpu.sh` at system startup to program the FPGA fabric on the KV260 board.
@@ -104,6 +114,8 @@ ActuatorManager
 * The `VideoDashboard` is responsible for the main execution loop, rendering frames and reading GUI key inputs (e.g., pressing `'q'` to gracefully terminate).
 * The system aborts startup completely if the expected BlueCoin devices configured in `config.yaml` are not discovered after the 5-retry loop window.
 * If no hardware actuator is discovered, the core event detection, IMU classification pipelines, and logging systems will still execute normally.
+
+---
 
 ### Project Structure 
 ```text
@@ -166,8 +178,12 @@ CPSA_2026/
 └── xmutil_load_dpu.sh
 ```
 
+---
+
 ## Runtime Components
 ### IMU Pipeline
+
+---
 
 ### Video Pipeline
  The current video pipeline is managed within a single background thread (YoloDpuThread) executing a three-stage hybrid cascade:
@@ -194,6 +210,8 @@ CPSA_2026/
                         (Top-40% of Body) ──► [ Target: Crop ] ──┘
 ```
 The video thread is created and started by main.py. It deserializes and loads both DPU models and then remains idle until activated by the dispatcher.
+
+---
 
 ### YOLO & ResNet18
 
@@ -241,6 +259,8 @@ YOLO & ResNet18 DPU Thread responsibilities:
 * Save results safely using Thread Locks:
   While the background thread runs at maximum speed capturing and analyzing frames, it continuously updates the system status (whether a person is found, their box coordinates, and the drowsiness prediction). To prevent data corruption or memory conflicts with the main program trying to read these values at the same time, all shared variables are securely protected using mutual exclusion "locks".
 
+---
+
 ### Actuation Policy
 
 `DrowsyAlertPolicy` decides when to trigger audio alarms based on drowsiness detection and speaker cooldown limits.
@@ -262,6 +282,8 @@ speaker:
   retry_sleep: 60
 ```
 
+---
+
 ### Event System and Dispatcher
 The event queue is shared across runtime components and consumed by the dispatcher.
 
@@ -274,15 +296,11 @@ The dispatcher translates numerical sensor tags (e.g., from an IMU) into human-r
 *   `1` -> `SLOW_DRIFT`
 *   `3` -> `SUDDEN_DROP`
 
----
-
 #### Video-Stage Behavior
 The dispatcher dynamically controls the execution of the video pipeline (YOLO/ResNet) to optimize processing resources and maintain battery life:
 *   Trigger Rules: If an anomalous IMU sensor tag is encountered (`1: SLOW_DRIFT` or `3: SUDDEN_DROP`), the video thread is immediately initialized/activated.
 *   `NATURAL` State Auto-Off Countdown: If the active video model pipeline predicts a stable `NATURAL` state continuously for `AWAKE_OFF_DELAY_SEC` (set to 5.0 seconds), the video pipeline is turned off automatically to conserve resources.
 *   Anti-Blink Suppression Filter: When a `DROWSY` state is predicted by the video module, the system ensures a continuous duration threshold of less than 1.0 second is treated as a blink. This prevents brief eye blinks from accidentally resetting the camera shutdown timer and suppresses short false positives.
-
----
 
 #### Actuation & Cooldown Behavior
 *   Trigger Priorities:
@@ -308,6 +326,8 @@ The system implements an Anti-Blink Filter within the `EventDispatcher` pipeline
 #### State Reset Conditions
 * The moment the video pipeline returns a `NATURAL` prediction, the `self._drowsy_since_ts` timestamp is immediately reset to `None`, clearing the window for the next event.
 
+---
+
 ### Dashboard
 The dashboard manages the main graphical user interface using OpenCV, combining the live camera stream and system logs into a single window.
 
@@ -321,14 +341,14 @@ The dashboard manages the main graphical user interface using OpenCV, combining 
 *   Centralized Rendering: The dashboard owns the window context and handles all rendering operations.
 *   System Exit: Pressing `q` inside the window terminates the application cleanly.
 
+---
+
 ### Logging
 The system includes a centralized logging infrastructure to track the application's runtime behavior and sensor transitions.
 
 #### Features and Data Tracked
 *   **Monitored Operations**: The pipeline records system operations, event queue updates, physical actuation details, and raw console outputs.
 *   **File Export**: Log archives are automatically saved to disk using an organized folder structure located under the directory path defined by `log_base_path`.
-
----
 
 #### Configuration Variables
 All main logging behaviors are controlled directly inside `config.yaml` using the following properties:
