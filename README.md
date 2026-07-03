@@ -264,7 +264,7 @@ speaker:
 The event queue is shared across runtime components and consumed by the dispatcher.
 
 #### Queue Configuration
-*   **`event_queue_size`**: Managed asynchronously via a shared `get_event_queue()` mechanism. The thread uses a 0.5-second polling timeout to gracefully handle idle states, check internal resource timers, and process continuous video-only policies when no new sensor data arrives.
+*   **`event_queue_size`**: Managed asynchronously via a shared `get_event_queue()` mechanism. The thread uses a 0.5-second polling timeout to handle idle states, check internal resource timers, and process continuous video-only policies when no new sensor data arrives.
 
 #### Classification Mapping
 The dispatcher translates numerical sensor tags (e.g., from an IMU) into human-readable labels:
@@ -278,15 +278,15 @@ The dispatcher translates numerical sensor tags (e.g., from an IMU) into human-r
 The dispatcher dynamically controls the execution of the video pipeline (YOLO/ResNet) to optimize processing resources and maintain battery life:
 *   **Trigger Rules**: If an anomalous IMU sensor tag is encountered (`1: SLOW_DRIFT` or `3: SUDDEN_DROP`), the video thread is immediately initialized/activated.
 *   **`NATURAL` State Auto-Off Countdown**: If the active video model pipeline predicts a stable `NATURAL` state continuously for `AWAKE_OFF_DELAY_SEC` (set to **5.0 seconds**), the video pipeline is turned off automatically to conserve resources.
-*   **Anti-Blink Suppression Filter**: When a `DROWSY` state is predicted by the video module, the system ensures a continuous duration threshold of less than 1.0 second is treated as a normal physiological blink. This prevents the camera shutdown sequence from breaking instantly and suppresses short false positives before they affect internal state tracking.
+*   **Anti-Blink Suppression Filter**: When a `DROWSY` state is predicted by the video module, the system ensures a continuous duration threshold of less than 1.0 second is treated as a blink. This prevents brief eye blinks from accidentally resetting the camera shutdown timer and suppresses short false positives.
 
 ---
 
 #### Actuation & Cooldown Behavior
 *   **Trigger Priorities**:
-    *   *Video Off*: The system relies strictly on sensor anomalies (`1` or `3`) to trigger a countermeasure policy.
-    *   *Video On*: The dispatcher suppresses/ignores raw sensor tags entirely. Policy evaluations are dictated exclusively by active AI video prediction states.
-*   **Audio-Alarm Anti-Blink Filter**: If the video module yields a `DROWSY` prediction but the condition has persisted for less than 1.0 continuous second, the state is temporarily overridden to `None` to prevent an accidental physical speaker alarm from firing.
+    *   *Video Off*: The system relies on sensor anomalies (`1` or `3`) to trigger the policy.
+    *   *Video On*: The dispatcher ignores raw sensor tags entirely. Policy evaluations are dictated exclusively by active AI video prediction states.
+*   **Audio-Alarm Anti-Blink Filter**: If the video module yields a `DROWSY` prediction but the condition has persisted for less than 1.0 continuous second, the state is temporarily overridden to `None` to prevent an accidental speaker alarm from playing.
 *   **Rate Limiting**: Consecutive policies are restricted by an `ACTUATION_COOLDOWN` window (currently **5 seconds**) before another physical trigger can occur.
 
 ---
@@ -296,20 +296,15 @@ System state assessments flow sequentially along the following execution path:
 
 ### Deep Dive: Anti-Blink Filter Mechanics
  
-The system implements a software-level **Anti-Blink Filter** within the `EventDispatcher` pipeline to distinguish between a normal human eye blink (physiological transient state) and a true microsleep event. This prevents false positives and unnecessary audio flooding.
+The system implements an **Anti-Blink Filter** within the `EventDispatcher` pipeline to distinguish between a normal human eye blink and a sleep event. This prevents false positives and unnecessary audio flooding.
  
-#### Core Logic & Timing Thresholds
+#### Timing Thresholds
 1. **State Interception**: When the computer vision model (YOLO/ResNet) outputs a `DROWSY` prediction, the `EventDispatcher` immediately captures the event inside `_process_policy_for_event`.
 2. **Monotonic Tracking**: The dispatcher initiates a duration window tracking mechanism:
    * If `self._drowsy_since_ts` is empty (`None`), it locks the current time using `time.monotonic()`.
    * On subsequent frames, it calculates the delta: $\Delta t = \text{now} - \text{self.\_drowsy\_since\_ts}$.
-3. **Suppression Phase ($\Delta t < 1.0\text{s}$)**: If the continuous duration of the `DROWSY` state is strictly **less than 1.0 second**, the system flags the behavior as a standard eye blink. The dispatcher actively overrides the prediction to `None` (`current_pred = None`) before forwarding the context payload to the policy engine.
-4. **Trigger Phase ($\Delta t \ge 1.0\text{s}$)**: If the user's eyes remain closed and the `DROWSY` status persists continuously for 1.0 second or longer, the state is validated as an actual microsleep anomaly. The dispatcher passes the raw `DROWSY` status to `DrowsyAlertPolicy.handle()`, which checks the 5-second per-speaker cooldown and yields the execution payload.
- 
-#### Structural Decoupling (Pipeline vs. Actuator)
-This filter is deliberately decoupled from the hardware execution layer:
-* **The Dispatcher/Policy Layer** acts as the intelligent gatekeeper, running state analysis and managing chronological thresholds.
-* **The Actuator Layer (`SpeakerThread`)** remains completely decoupled from time-tracking logic. It is an execution-only component that does not process filters, timers, or blink criteria; it triggers audio playback immediately upon receiving a valid routed payload from `ActuatorManager`.
+3. **Suppression Phase ($\Delta t < 1.0\text{s}$)**: If the continuous duration of the `DROWSY` state is less than 1.0 second, the system flags the behavior as a standard eye blink.
+4. **Trigger Phase ($\Delta t \ge 1.0\text{s}$)**: If the user's eyes remain closed and the `DROWSY` status persists continuously for 1.0 second or longer, the state is validated as an actual microsleep anomaly. The dispatcher passes the raw `DROWSY` status to `DrowsyAlertPolicy.handle()`, which checks the 5-second per-speaker cooldown and activates the speaker sounds.
  
 #### State Reset Conditions
-* The moment the video pipeline returns a prediction other than `DROWSY` (e.g., `NATURAL`), the `self._drowsy_since_ts` timestamp is immediately reset to `None`, clearing the window for the next potential event.
+* The moment the video pipeline returns a `NATURAL` prediction, the `self._drowsy_since_ts` timestamp is immediately reset to `None`, clearing the window for the next event.
