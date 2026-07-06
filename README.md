@@ -96,22 +96,22 @@ ActuatorManager
 
 ### Runtime Flow
 ```text
-1. Create the VideoDashboard and register the dashboard console.
-2. Create SensorManager and ActuatorManager.
-3. Instantiate DrowsinessClassifier.
-4. Scan BLE sensor and read expected BlueCoin name from config.yaml.
-5. Retry BlueCoin discovery up to 5 times if expected device is missing (exit on failure).
-6. Scan for speaker actuator and initialize it.
-7. Read discovered actuator ID from the ActuatorManager.
-8. Initialize and start sensor thread.
-9. Create PersonRoiState.
-10. Create YoloDpuThread (passing the roi\_state).
-11. Create DrowsyAlertPolicy using the discovered actuator ID.
-12. Create EventDispatcher with actuator manager, policy, YOLO thread, and roi\_state.
-13. Start the EventDispatcher thread.
-14. Enter the main dashboard render loop.
-15. Loop until 'q' is pressed in the GUI or a KeyboardInterrupt (Ctrl+C) is received.
-16. Cleanly stop dispatcher, sensor manager, actuator manager, video thread, and unregister dashboard resources.
+1. **Initialize the UI:** Create the `VideoDashboard` and register the dashboard console.
+2. **Initialize Managers:** Create the `SensorManager` and `ActuatorManager`.
+3. **Configure Classifier:** Instantiate the `DrowsinessClassifier` and link its recognition method as the data sink for the IMU synchronizer buffer.
+4. **Scan Sensors:** Scan for BLE sensors and read the expected BlueCoin names from `config.yaml`.
+5. **Sensor Retry Mechanism:** Retry BlueCoin discovery up to 5 times (with a 3-second delay) if the expected device is missing. Exit the pipeline if the hardware is not found.
+6. **Scan Actuators:** Scan for the speaker actuator and initialize it.
+7. **Retrieve Actuator IDs:** Read the discovered actuator IDs from the `ActuatorManager`.
+8. **Start Sensing Layer:** Initialize and start the sensor threads to begin streaming IMU data over BLE.
+9. **Configure Alert Policy:** Create the `DrowsyAlertPolicy` using the discovered actuator IDs.
+10. **Initialize Computer Vision:** Create the `PersonRoiState` and instantiate the `YoloDpuThread` (passing the ROI state), starting it in standby/idle mode.
+11. **Configure Orchestrator:** Create the `EventDispatcher` with the actuator manager, alert policy, YOLO thread, and ROI state.
+12. **Start Orchestrator:** Start the `EventDispatcher` background thread.
+13. **Hardware Synchronization (Polling):** Enter a connection polling loop (up to 60 seconds), waiting to verify that both the BlueCoin sensors and Speaker actuators report a fully `CONNECTED` status.
+14. **Enter UI Loop:** Enter the main dashboard rendering loop to display system status and video feeds.
+15. **Listen for Exit Commands:** Continue the execution loop until `q` is pressed in the GUI or a `KeyboardInterrupt` (Ctrl+C) is received in the terminal.
+16. **Safe Shutdown:** In the `finally` block, cleanly stop the dispatcher, sensor manager, actuator manager, video thread, and unregister all dashboard resources to free up hardware.
 ```
 
 ---
