@@ -196,6 +196,7 @@ The following libraries are imported across the system architecture and must be 
 *   Concurrency & Communication: `threading`, `queue`, `asyncio`.
 *   Wireless & Hardware Interfaces: `bluepy`, `blue_st_sdk`, `dbus_fast`.
 *   Data Processing, Vision & Audio: `numpy`, `cv2` (OpenCV), `playsound`.
+*   The file sensors/BLE/feature_mems_sensor_fusion_compact.py must be present in the repository even though quaternions are not used by the IMU pipeline. The version of blue_st_sdk installed on the Kria board imports that module at load time from sensors.BLE; removing it causes an ImportError that propagates through the entire import chain starting from bluecoin.py.
 
 ---
 
@@ -273,7 +274,185 @@ python3 main.py
 ---
 
 ## Runtime Components
-### IMU Pipeline
+## IMU Pipeline
+
+Real-time drowsiness detection module based on a single head-mounted STM BlueCoin sensor.
+
+The module receives raw accelerometer and gyroscope data over BLE, estimates the head pitch angle through a complementary filter and classifies two drowsiness patterns: sudden drop and slow drift. Detected events are sent to the central `EventDispatcher`, which manages alert actuator activation and the video pipeline trigger.
+
+---
+
+### Architecture
+
+```
+[ STM BlueCoin CPSA_L2 (bc_left) ]
+                 │
+                 ▼ (Asynchronous BLE Notifications: acc [mg], gyr [dps])
+ 1. Feature Listeners (Accel/Gyro Listeners)
+                 │
+                 ▼ synchronizer.update("bc_left", kind, values, ts)
+ 2. IMUSynchronizer
+                 │
+                 ├──► [ Non-matching Timestamps ] ──► (Wait / Drop Async Data)
+                 │
+                 └──► [ Timestamps Aligned ]
+                           │
+                           ▼ buffer.add_buffer_row(Lacc, Lgyr, ts_emit)
+                   3. DataBuffer (Sliding Window Processing)
+                           │
+                           ├──► [ Window Size < 150 ] ──► (Accumulating Samples)
+                           │
+                           └──► [ Window Size = 150 (Hop: 75) ]
+                                     │
+                                     ├──► [ First Window ] ──► (Discard / Warmup Phase)
+                                     │
+                                     └──► [ Valid Window ]
+                                               │
+                                               ▼ (Scale: mg → g & Pack into structured dict)
+                                       4. DrowsinessClassifier
+                                          (Complementary Filter + State Machine)
+                                               │
+                                               ▼ classifier.recognize(window_payload, window_end_ts)
+                                               │
+                                               ▼ Genereate Event: drowsiness_tag ("0" | "1" | "2")
+                                       5. Event Queue (FIFO)
+                                               │
+                                               ├──► [ Queue Full ] ──► (enqueue_drop_oldest)
+                                               │
+                                               └──► [ Push Event ]
+                                                         │
+                                                         ▼
+                                               [ EventDispatcher ] ──► (Camera / Actuator Activation)
+```
+
+---
+
+## Data flow in detail
+
+### 1. BLE acquisition — `feature_listeners.py`
+
+`AccelerometerFeatureListener` and `GyroscopeFeatureListener` are registered on the BlueCoin BLE features by `BlueCoinThread`. Every time the sensor firmware sends a BLE notification, `on_update()` is invoked, converts the raw data to a float tuple and calls `synchronizer.update()`.
+
+### 2. Pairing — `synchronizer.py`
+
+`IMUSynchronizer` maintains a `DeviceState` object for `bc_left`. Each `update()` call stores the incoming acc or gyr measurement. When both fields are populated (`is_ready() = acc is not None and gyr is not None`), the pair is emitted to the buffer and the state is cleared, ready for the next sample pair.
+
+This guarantees that accelerometer and gyroscope data are always forwarded as coherent pairs — the buffer never receives an acc sample without its corresponding gyr, or vice versa. Any packet that arrives with an unrecognised `device_id` is silently dropped via the early-return guard.
+
+### 3. Sliding window — `data_buffer.py`
+
+`DataBuffer` accumulates incoming rows in an internal list. When the list reaches `window_size` samples (150 by default), it emits a window and advances the cursor by `hop_size` samples (75), retaining the last 75 samples as overlap with the next window.
+
+The first window is always silently discarded (warmup), to prevent potentially noisy BLE startup data from influencing the filter calibration.
+
+Before passing data to the classifier, the buffer scales the accelerometer from mg to g (division by 1000) and packs everything into a structured dict:
+
+```python
+window_payload = {
+    'accX':     np.array([...], dtype=float32) / 1000.0,  # pitch axis   [g]
+    'accZ':     np.array([...], dtype=float32) / 1000.0,  # vertical     [g]
+    'gyrX':     np.array([...], dtype=float32),            # pitch ω      [dps]
+    'ts_array': np.array([...], dtype=float64),            # timestamps   [s]
+    'hop_size': 75                                         # new samples in this window
+}
+```
+
+Note: Only `accX`, `accZ`, `gyrX` are extracted and forwarded as these are the exclusive inputs required by the classifier.
+
+### 4. Classification — `drowsiness_classifier.py`
+
+`DrowsinessClassifier` is the algorithmic core. It receives each window from the buffer, processes only the new samples (anti-overlap computation), applies the complementary filter sample by sample, updates the baseline and runs the state machine.
+
+#### Anti-overlap computation
+
+Since windows overlap by 50%, each window contains samples already processed by the previous one. The classifier processes only the last `hop_size` samples:
+
+```python
+if self.last_processed_ts == 0.0:
+    start_idx = 0                      # first window: process everything
+else:
+    start_idx = len(accX) - hop_size   # subsequent windows: new tail only
+```
+
+#### Complementary filter
+
+For each new sample, the filter fuses two sources to estimate head pitch:
+
+```
+θ_accel = atan2(accX, |accZ|)                        — accurate long-term, noisy
+θ_gyro  = θ_prev + ω · dt                            — accurate short-term, drifts
+θ       = α · θ_gyro + (1-α) · θ_accel   if static
+θ       = θ_gyro                           if gated (vehicle accelerating)
+```
+
+The accelerometer gate (`|a_total - 1g| > gate_thresh_g`) disables the accelerometer correction when the vehicle is accelerating or braking, preventing parasitic accelerations from distorting the pitch estimate.
+
+The `dt` is computed from real BLE timestamps rather than a fixed nominal value, with a fallback to `1/target_fs` (1/100Hz in this case) on gaps or out-of-order packets.
+
+#### Dynamic baseline
+
+The driver's neutral posture is estimated and updated once per second over a 30-second rolling history. Only samples within ±5° of the current baseline contribute to the recalculation, preventing drowsiness episodes from pulling the reference point along with them.
+
+#### State machine — detected events
+
+All patterns are evaluated on the deviation `Δθ = θ − baseline`.
+
+**Sudden drop — tag `2`** (highest priority)
+
+Analyses the last 0.40 s of history (40 samples at 100 Hz). Fires when all four conditions are met simultaneously: current deviation > 10°, current angular velocity > 10 dps, peak angular velocity in the window > 10 dps, total excursion of the deviation in the window > 10°. The initial two conditions provide an instantaneous assessment, whereas the subsequent two introduce a temporal analysis dimension.
+
+**Slow drift — tag `1`**
+
+Fires when the deviation exceeds 10° and remains sustained for at least 1.5 seconds with angular velocity < 12 dps (the movement must be slow — a fast movement would already be captured by the sudden drop). If the condition breaks at any point before the timer expires, the episode is discarded and the timer resets.
+
+**Awake — tag `0`**
+
+Default state. Emitted every window when no pattern is detected, allowing `EventDispatcher` to detect the return-to-normal transition.
+
+After any event fires, a **5-second refractory period** blocks new triggers. During this window the state machine returns the last detected tag rather than `0`, keeping the dispatcher informed of the sustained alert state.
+
+#### Event output
+
+One event is produced per window regardless of detected state. The event is inserted into the shared queue via `enqueue_drop_oldest()`: if the queue is full, the oldest item is popped and logged with reason `"queue_full"` before the new event is inserted.
+
+### 5. Hardware Orchestration & Pipeline Wiring — sensor_manager.py
+
+The `SensorManager` is responsible for coordinating the hardware lifecycle and connecting the streaming data to the drowsiness classifier:
+
+* **Pipeline Wiring (`__init__`):** Loads the BlueCoin configuration, instantiates the `IMUSynchronizer` and registers the `DrowsinessClassifier` as the target feature sink for the data buffer.
+* **Device Discovery (`scan_sensors`):** Performs a BLE scan for BlueCoin devices and stores the results internally.
+* **Thread Initialization (`initialize_sensors`):** Initializes a single sensor thread specifically for the left BlueCoin device. It extracts the accelerometer and gyroscope features from the node and pairs them with their respective listeners.
+* **Resource Cleanup (`stop_all`):** Stops all active sensor threads and clears the internal tracking list to ensure a clean shutdown.
+---
+
+## Configuration and tuning parameters
+
+### `DrowsinessClassifier` — algorithmic parameters
+
+| Configurable parameters | Default | Effect |
+|---|---|---|
+| `alpha` | `0.96` | Gyroscope weight in the filter. Raise → faster response, more long-term drift. Lower → less drift, more sensitive to vehicle vibrations |
+| `gate_thresh_g` | `0.15 g` | Gating threshold. Raise → correction active even during mild vehicle motion. Lower → more conservative, ignores accel more often |
+| `sudden_drop_gyro_thresh` | `10.0 dps` | Minimum angular velocity to qualify a sudden drop. Lower for higher sensitivity; raise to reduce false positives from road bumps |
+| `sudden_drop_angle_thresh` | `10.0 °` | Minimum angular excursion over the 0.40 s analysis window |
+| `slow_drift_angle_thresh` | `10.0 °` | Deviation from baseline beyond which the drift timer starts |
+| `slow_drift_max_gyro` | `12.0 dps` | Maximum angular velocity for a movement to be classified as a slow drift |
+| `target_fs` | `100.0 Hz` | Nominal sampling rate — used to size sample-count windows and as dt fallback |
+
+| Hard-coded parameters | Default | Effect |
+|---|---|---|
+| `SLOW_DRIFT_DURATION_SEC` | `1.5 s` | Time the head must remain above threshold to fire the alert |
+| `SUDDEN_DROP_WINDOW_SEC` | `0.40 s` | Duration of the analysis window for sudden drop detection |
+| `REFRACTORY_SEC` | `5.0 s` | Minimum time between any two consecutive events |
+| `HISTORY_WINDOW_SEC` | `30.0 s` | Length of the circular history deques used for baseline estimation |
+
+
+### Recommended tuning workflow
+
+The most efficient starting point is an annotated session: record the BlueCoin CSV logs (gyroscope and accelerometer separately), replay them through the offline script `drowsiness_detection.py` included in the repository, and inspect the three-panel plot (pitch, angular velocity, Δθ). Lower the thresholds until all known events are captured, then raise them until false positives in the baseline driving segment (typically the first 30–50 seconds with no drowsiness) disappear.
+
+
+
 
 ---
 
