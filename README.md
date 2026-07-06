@@ -4,7 +4,7 @@
 
 * [System View](#system-view)
 * [Architecture and Working Principle](#architecture-and-working-principle)
-  * [Architecture](#architecture)
+  * [System Architecture](#system-architecture)
   * [Runtime Flow](#runtime-flow)
   * [Important Runtime Details](#important-runtime-details)
   * [Project Structure](#project-structure)
@@ -14,9 +14,11 @@
   * [DPU / Vitis-AI Runtime Setup](#dpu--vitis-ai-runtime-setup)
   * [Configuration](#configuration)
   * [Run Procedure](#run-procedure)
-* [Runtime Components](#runtime-components)
-  * [IMU Pipeline](#imu-pipeline)
-  * [Video Pipeline](#video-pipeline)
+* [IMU Pipeline](#imu-pipeline)
+  * [Architecture](#architecture)
+  * [Data Flow](#data-flow)
+  * [Configuration and tuning parameters](#configuration-and-tuning-parameters)
+* [Video Pipeline](#video-pipeline)
   * [YOLO & ResNet18](#yolo--resnet18)
   * [Actuation Policy](#actuation-policy)
   * [Event System and Dispatcher](#event-system-and-dispatcher)
@@ -53,7 +55,7 @@ The system is organized around an IMU-first event loop. A BlueCoin device provid
 
 ---
 
-### Architecture
+### System Architecture
 
 ```text
 BlueCoin BLE Sensors
@@ -273,9 +275,7 @@ python3 main.py
 
 ---
 
-## Runtime Components
-
-### IMU Pipeline
+## IMU Pipeline
 
 Real-time drowsiness detection module based on a single head-mounted STM BlueCoin sensor.
 
@@ -283,7 +283,7 @@ The module receives raw accelerometer and gyroscope data over BLE, estimates the
 
 ---
 
-#### Architecture
+### Architecture
 
 ```
 [ STM BlueCoin CPSA_L2 (bc_left) ]
@@ -328,19 +328,19 @@ The module receives raw accelerometer and gyroscope data over BLE, estimates the
 
 ---
 
-### Data Flow
+## Data Flow
 
-#### 1. BLE acquisition — `feature_listeners.py`
+### 1. BLE acquisition — `feature_listeners.py`
 
 `AccelerometerFeatureListener` and `GyroscopeFeatureListener` are registered on the BlueCoin BLE features by `BlueCoinThread`. Every time the sensor firmware sends a BLE notification, `on_update()` is invoked, converts the raw data to a float tuple and calls `synchronizer.update()`.
 
-#### 2. Pairing — `synchronizer.py`
+### 2. Pairing — `synchronizer.py`
 
 `IMUSynchronizer` maintains a `DeviceState` object for `bc_left`. Each `update()` call stores the incoming acc or gyr measurement. When both fields are populated (`is_ready() = acc is not None and gyr is not None`), the pair is emitted to the buffer and the state is cleared, ready for the next sample pair.
 
 This guarantees that accelerometer and gyroscope data are always forwarded as coherent pairs — the buffer never receives an acc sample without its corresponding gyr, or vice versa. Any packet that arrives with an unrecognised `device_id` is silently dropped via the early-return guard.
 
-#### 3. Sliding window — `data_buffer.py`
+### 3. Sliding window — `data_buffer.py`
 
 `DataBuffer` accumulates incoming rows in an internal list. When the list reaches `window_size` samples (150 by default), it emits a window and advances the cursor by `hop_size` samples (75), retaining the last 75 samples as overlap with the next window.
 
@@ -360,11 +360,11 @@ window_payload = {
 
 Note: Only `accX`, `accZ`, `gyrX` are extracted and forwarded as these are the exclusive inputs required by the classifier.
 
-#### 4. Classification — `drowsiness_classifier.py`
+### 4. Classification — `drowsiness_classifier.py`
 
 `DrowsinessClassifier` is the algorithmic core. It receives each window from the buffer, processes only the new samples (anti-overlap computation), applies the complementary filter sample by sample, updates the baseline and runs the state machine.
 
-##### Anti-overlap computation
+#### Anti-overlap computation
 
 Since windows overlap by 50%, each window contains samples already processed by the previous one. The classifier processes only the last `hop_size` samples:
 
@@ -375,7 +375,7 @@ else:
     start_idx = len(accX) - hop_size   # subsequent windows: new tail only
 ```
 
-##### Complementary filter
+#### Complementary filter
 
 For each new sample, the filter fuses two sources to estimate head pitch:
 
@@ -390,11 +390,11 @@ The accelerometer gate (`|a_total - 1g| > gate_thresh_g`) disables the accelerom
 
 The `dt` is computed from real BLE timestamps rather than a fixed nominal value, with a fallback to `1/target_fs` (1/100Hz in this case) on gaps or out-of-order packets.
 
-##### Dynamic baseline
+#### Dynamic baseline
 
 The driver's neutral posture is estimated and updated once per second over a 30-second rolling history. Only samples within ±5° of the current baseline contribute to the recalculation, preventing drowsiness episodes from pulling the reference point along with them.
 
-##### State machine — detected events
+#### State machine — detected events
 
 All patterns are evaluated on the deviation `Δθ = θ − baseline`.
 
@@ -412,11 +412,11 @@ Default state. Emitted every window when no pattern is detected, allowing `Event
 
 After any event fires, a **5-second refractory period** blocks new triggers. During this window the state machine returns the last detected tag rather than `0`, keeping the dispatcher informed of the sustained alert state.
 
-#### Event output
+### Event output
 
 One event is produced per window regardless of detected state. The event is inserted into the shared queue via `enqueue_drop_oldest()`: if the queue is full, the oldest item is popped and logged with reason `"queue_full"` before the new event is inserted.
 
-#### 5. Hardware Orchestration & Pipeline Wiring — sensor_manager.py
+### 5. Hardware Orchestration & Pipeline Wiring — sensor_manager.py
 
 The `SensorManager` is responsible for coordinating the hardware lifecycle and connecting the streaming data to the drowsiness classifier:
 
