@@ -399,7 +399,7 @@ The dispatcher dynamically controls the execution of the video pipeline (YOLO/Re
     *   *Video Off*: The system relies on sensor anomalies (`1` or `2`) to trigger the policy.
     *   *Video On*: The dispatcher ignores raw sensor tags entirely. Policy evaluations are dictated exclusively by active AI video prediction states.
 *   Audio-Alarm Anti-Blink Filter: If the video module yields a `DROWSY` prediction but the condition has persisted for less than 1.0 continuous second, the state is temporarily overridden to `None` to prevent an accidental speaker alarm from playing.
-*   Rate Limiting: Consecutive policies are restricted by an `ACTUATION\_COOLDOWN` window (currently 5 seconds) before another physical trigger can occur.
+*   Rate Limiting: Consecutive policies are restricted by an `ACTUATION_COOLDOWN` window (currently 5 seconds) before another physical trigger can occur.
 
 ---
 
