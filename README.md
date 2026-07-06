@@ -328,9 +328,9 @@ YOLO & ResNet18 DPU Thread responsibilities:
   Once the person's bounding box is isolated, the system runs a traditional face detection algorithm (Haar Cascade) on the main CPU. This script analyzes the area inside the person's box to specifically look for facial features (eyes, nose, mouth) in a frontal position.
 
 * Apply a smart geometric fallback crop if the face is undetected:
-  If the software fails to find a face (for example, if the subject turns around, is in profile, or the lighting changes), a backup geometric plan triggers automatically based on standard human body proportions. This process happens in two clear stages:
+  If Haar Cascade fails to find a face (for example, if the subject turns around, is in profile, or the lighting changes), a backup geometric plan triggers automatically, based on standard human body proportions. This process happens in two clear stages:
   
-  * Stage 1 (Reconstruction): It isolates only the top 40% height of the person's body box (where the head and shoulders are expected to be), calculates the exact horizontal center, and forces a custom width equal to 120% of that isolated height to create a perfectly proportioned box around the head and neck.
+  * Stage 1 (Reconstruction): It isolates only the top 40% height of the person's body box (where the head and shoulders are expected to be), calculates the exact horizontal center and forces a custom width equal to 120% of that isolated height to create a perfectly proportioned box around the head and neck.
   * Stage 2 (Margin Expansion): This newly calculated box is then expanded outward by 30% on all sides. This acts like "zooming out" slightly to include surrounding context (like hair, ears, or clothing), which helps the secondary AI model understand the image better.
 
   > Visual Breakdown of the Fallback Strategy:
@@ -346,10 +346,10 @@ YOLO & ResNet18 DPU Thread responsibilities:
   > ```
 
 * Run the state classifier (ResNet18) conditionally:
-  The secondary AI model (ResNet18) runs on the DPU chip only when necessary. If YOLO detects no people in the room, ResNet is completely skipped to save power consumption. If a person is present (with either a detected face or an estimated fallback region), ResNet processes that specific crop to classify whether the subject is alert (*NATURAL*) or showing signs of fatigue (*DROWSY*).
+  The secondary AI model (ResNet18) runs on the DPU chip only when necessary. If YOLO detects no people in the room, ResNet is completely skipped to save power consumption. If a person is present (with either a detected face or an estimated fallback region), ResNet processes that specific crop to classify whether the subject is awake (*NATURAL*) or showing signs of fatigue (*DROWSY*).
 
 * Save results safely using Thread Locks:
-  While the background thread runs at maximum speed capturing and analyzing frames, it continuously updates the system status (whether a person is found, their box coordinates, and the drowsiness prediction). To prevent data corruption or memory conflicts with the main program trying to read these values at the same time, all shared variables are securely protected using mutual exclusion "locks".
+  While the background thread runs at maximum speed capturing and analyzing frames, it continuously updates the system status (whether a person is found, their box coordinates and the drowsiness prediction). To prevent data corruption or memory conflicts with the main program trying to read these values at the same time, all shared variables are securely protected using mutual exclusion "locks".
 
 ---
 
