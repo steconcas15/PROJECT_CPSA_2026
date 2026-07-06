@@ -20,11 +20,11 @@
   * [Configuration and tuning parameters](#configuration-and-tuning-parameters)
 * [Video Pipeline](#video-pipeline)
   * [YOLO & ResNet18](#yolo--resnet18)
-  * [Actuation Policy](#actuation-policy)
-  * [Event System and Dispatcher](#event-system-and-dispatcher)
+* [Actuation Policy](#actuation-policy)
+* [Event System and Dispatcher](#event-system-and-dispatcher)
   * [Anti-Blink Filter Mechanism](#anti-blink-filter-mechanism)
-  * [Dashboard](#dashboard)
-  * [Logging](#logging)
+* [Dashboard](#dashboard)
+* [Logging](#logging)
 
 ---
 
