@@ -102,21 +102,10 @@ ActuatorManager
 10. **Initialize Computer Vision:** Create the `PersonRoiState` and instantiate the `YoloDpuThread` (passing the ROI state), starting it in standby/idle mode.
 11. **Configure Orchestrator:** Create the `EventDispatcher` with the actuator manager, alert policy, YOLO thread, and ROI state.
 12. **Start Orchestrator:** Start the `EventDispatcher` background thread.
-13. **Hardware Synchronization (Polling):** Enter a connection polling loop (up to 60 seconds), waiting to verify that both the BlueCoin sensors and Speaker actuators report a fully `CONNECTED` status.
+13. **Hardware Synchronization (Polling):** Enter a connection polling loop (up to 60 seconds), waiting to verify that both the BlueCoin sensor and Speaker actuator report a `CONNECTED` status.
 14. **Enter UI Loop:** Enter the main dashboard rendering loop to display system status and video feeds.
 15. **Listen for Exit Commands:** Continue the execution loop until `q` is pressed in the GUI or a `KeyboardInterrupt` (Ctrl+C) is received in the terminal.
 16. **Safe Shutdown:** In the `finally` block, cleanly stop the dispatcher, sensor manager, actuator manager, video thread, and unregister all dashboard resources to free up hardware.
----
-
-### Important Runtime Details
-
-* The DPU overlay must be loaded before `main.py` starts. Use `bash xmutil\_load\_dpu.sh` at system startup to program the FPGA fabric on the KV260 board.
-* `main.py` is the direct runtime entry point.
-* The `YoloDpuThread` is started at boot but stays idle, keeping the physical camera interface suspended until the `EventDispatcher` activates it upon event detection.
-* The `VideoDashboard` is responsible for the main execution loop, rendering frames and reading GUI key inputs (e.g., pressing `'q'` to gracefully terminate).
-* The system aborts startup completely if the expected BlueCoin devices configured in `config.yaml` are not discovered after the 5-retry loop window.
-* If no hardware actuator is discovered, the core event detection, IMU classification pipelines, and logging systems will still execute normally.
-
 ---
 
 ### Project Structure 
