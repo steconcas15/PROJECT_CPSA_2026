@@ -387,17 +387,17 @@ The event queue is shared across runtime components and consumed by the dispatch
 The dispatcher translates numerical sensor tags (e.g., from an IMU) into human-readable labels:
 *   `0` -> `AWAKE`
 *   `1` -> `SLOW_DRIFT`
-*   `3` -> `SUDDEN_DROP`
+*   `2` -> `SUDDEN_DROP`
 
 #### Video-Stage Behavior
 The dispatcher dynamically controls the execution of the video pipeline (YOLO/ResNet) to optimize processing resources and maintain battery life:
-*   Trigger Rules: If an anomalous IMU sensor tag is encountered (`1: SLOW_DRIFT` or `3: SUDDEN_DROP`), the video thread is immediately initialized/activated.
+*   Trigger Rules: If an anomalous IMU sensor tag is encountered (`1: SLOW_DRIFT` or `2: SUDDEN_DROP`), the video thread is immediately initialized/activated.
 *   `NATURAL` State Auto-Off Countdown: If the active video model pipeline predicts a stable `NATURAL` state continuously for `AWAKE_OFF_DELAY_SEC` (set to 5.0 seconds), the video pipeline is turned off automatically to conserve resources.
 *   Anti-Blink Suppression Filter: When a `DROWSY` state is predicted by the video module, the system ensures a continuous duration threshold of less than 1.0 second is treated as a blink. This prevents brief eye blinks from accidentally resetting the camera shutdown timer and suppresses short false positives.
 
 #### Actuation & Cooldown Behavior
 *   Trigger Priorities:
-    *   *Video Off*: The system relies on sensor anomalies (`1` or `3`) to trigger the policy.
+    *   *Video Off*: The system relies on sensor anomalies (`1` or `2`) to trigger the policy.
     *   *Video On*: The dispatcher ignores raw sensor tags entirely. Policy evaluations are dictated exclusively by active AI video prediction states.
 *   Audio-Alarm Anti-Blink Filter: If the video module yields a `DROWSY` prediction but the condition has persisted for less than 1.0 continuous second, the state is temporarily overridden to `None` to prevent an accidental speaker alarm from playing.
 *   Rate Limiting: Consecutive policies are restricted by an `ACTUATION\_COOLDOWN` window (currently 5 seconds) before another physical trigger can occur.
