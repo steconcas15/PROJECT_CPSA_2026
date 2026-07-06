@@ -30,22 +30,17 @@
 
 ## System View
 
-* BLE BlueCoin acquisition for driver monitoring.
-* Accelerometer and gyroscope used to detect involuntary head falls.
-* IMU synchronization and timestamp alignment via dedicated synchronizer module.
-* Sliding-window buffering with configurable overlap to stream sensor features.
-* Drowsiness classifier integrated directly into the IMU pipeline.
-* Event queue with dispatching operations.
-* The event dispatcher manages synchronization between IMU events, YOLO activation and hardware triggers.
-* Staged DPU video pipeline:
-  * Hardware-accelerated YOLOv3 person/driver detection on the Xilinx DPU.
-  * ResNet18 classification developed for drowsiness and driver state estimation.
-  * Dynamically updated bounding box status managed via a PersonRoiState.
-* The dashboard GUI renders runtime states (standby/active feed) and handles user termination.
-* Modular actuator manager supporting:
-  * Bluetooth (BT) speaker feedback orchestration.
-* Drowsiness alert policy with feedback deployment based on active actuator ID.
-* Centralized shutdown of dispatcher, video threads, sensors, actuators, and dashboard resources
+* BLE BlueCoin acquisition for real-time driver state monitoring.
+* Acceleration and gyroscope data stream processing to identify involuntary head falls.
+* IMU synchronization and timestamp alignment via a dedicated synchronizer module.
+* Sliding-window buffering with configurable overlap to continuously stream sensor features.
+* Drowsiness classifier integrated directly into the IMU data pipeline.
+* Centralized event queue with dispatching operations to manage synchronization between IMU events, YOLO activation, and hardware triggers.
+* Multi-stage DPU video pipeline featuring hardware-accelerated YOLOv3 person detection and ResNet18 drowsiness classification.
+* Dynamic bounding box and state estimation management via the `PersonRoiState` module.
+* Dashboard GUI to render runtime execution states (standby/active feed) and capture user termination inputs.
+* Alert policy for Bluetooth (BT) speaker feedback.
+* Centralized, clean shutdown sequence for the dispatcher, video threads, sensors, actuators, and dashboard resources.
 
 ---
 
@@ -89,7 +84,7 @@ DrowsyAlertPolicy   ResNet18 Inference ───────────┘
        ▼
 ActuatorManager
        │
- └─► Bluetooth Speaker
+       └─► Bluetooth Speaker
 ```
 
 ---
