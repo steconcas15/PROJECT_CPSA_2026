@@ -346,10 +346,10 @@ YOLO & ResNet18 DPU Thread responsibilities:
   > ```
 
 * Run the state classifier (ResNet18) conditionally:
-  The secondary AI model (ResNet18) runs on the DPU chip only when necessary. If YOLO detects no people in the room, ResNet is completely skipped to save power consumption. If a person is present (with either a detected face or an estimated fallback region), ResNet processes that specific crop to classify whether the subject is awake (*NATURAL*) or showing signs of fatigue (*DROWSY*).
+  The secondary AI model (ResNet18) runs on the DPU chip only when necessary. If YOLO detects no people in the room, ResNet is completely skipped to save power consumption. If a person is present (with either a detected face or an estimated fallback region), ResNet processes that specific crop to classify whether the subject is awake (*NATURAL*) or showing signs of drowsiness (*DROWSY*).
 
 * Save results safely using Thread Locks:
-  While the background thread runs at maximum speed capturing and analyzing frames, it continuously updates the system status (whether a person is found, their box coordinates and the drowsiness prediction). To prevent data corruption or memory conflicts with the main program trying to read these values at the same time, all shared variables are securely protected using mutual exclusion "locks".
+  While the background thread runs at maximum speed capturing and analyzing frames, it continuously updates the system status (whether a person is found, the box coordinates and the drowsiness prediction). To prevent data corruption or memory conflicts with the main program trying to read these values at the same time, all shared variables are securely protected using mutual exclusion "locks".
 
 ---
 
