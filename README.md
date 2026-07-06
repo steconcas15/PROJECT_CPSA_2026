@@ -95,7 +95,6 @@ ActuatorManager
 ---
 
 ### Runtime Flow
-```text
 1. **Initialize the UI:** Create the `VideoDashboard` and register the dashboard console.
 2. **Initialize Managers:** Create the `SensorManager` and `ActuatorManager`.
 3. **Configure Classifier:** Instantiate the `DrowsinessClassifier` and link its recognition method as the data sink for the IMU synchronizer buffer.
@@ -112,7 +111,6 @@ ActuatorManager
 14. **Enter UI Loop:** Enter the main dashboard rendering loop to display system status and video feeds.
 15. **Listen for Exit Commands:** Continue the execution loop until `q` is pressed in the GUI or a `KeyboardInterrupt` (Ctrl+C) is received in the terminal.
 16. **Safe Shutdown:** In the `finally` block, cleanly stop the dispatcher, sensor manager, actuator manager, video thread, and unregister all dashboard resources to free up hardware.
-```
 
 ---
 
