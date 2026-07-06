@@ -1,9 +1,5 @@
 # main.py
 # Real-time Core Executive Layer for Drowsiness Detection Pipeline
-#
-# Author: Francesco Urru
-# Repository: https://github.com/frarvo/CPSA_2026
-# License: MIT
 
 import time
 
