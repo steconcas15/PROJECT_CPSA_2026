@@ -191,7 +191,7 @@ class DrowsinessClassifier:
         delta = theta - self.baseline
         abs_omega = abs(omega)
 
-        # ── EVENT 3: SUDDEN HEAD DROP (Maximum Danger) ───────────
+        # ── EVENT 2: SUDDEN HEAD DROP (Maximum Danger) ───────────
         sudden_samples = int(0.40 * self.target_fs)
         if len(self.theta_history) >= sudden_samples:
             recent_theta = list(self.theta_history)[-sudden_samples:]
@@ -206,7 +206,7 @@ class DrowsinessClassifier:
                 log_system(f"🚨 [SUDDEN DROP] Head dropped abruptly! t={t_now:.2f}s, Δθ={delta:.1f}°", level="WARNING")
                 self.last_event_time = t_now
                 self.in_drift = False
-                return 3  # Aligned with LABELS[3] = "SUDDEN_DROP"
+                return 2  # Aligned with LABELS[2] = "SUDDEN_DROP"
 
         # ── EVENT 1: SLOW HEAD DRIFT ─────────────────────────────
         if delta > self.slow_drift_angle_thresh and abs_omega < self.slow_drift_max_gyro:
