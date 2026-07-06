@@ -10,7 +10,7 @@ from utils.logger import log_system, log_event
 LABELS = {
     0: "AWAKE",
     1: "SLOW_DRIFT",
-    3: "SUDDEN_DROP",
+    2: "SUDDEN_DROP",
 }
 
 # Cooldown (in seconds) to prevent repeated actuator triggers within a short window
@@ -155,7 +155,7 @@ class EventDispatcher:
         # Scenario A: If the video is OFF, rely entirely on the IMU tags.
         # Trigger only if the tag indicates an anomaly (1 or 3) and the cooldown has elapsed.
         if not self._video_on:
-            return tag in (1, 3) and (self._last_actuation_time is None or (now_time - self._last_actuation_time) >= ACTUATION_COOLDOWN)
+            return tag in (1, 2) and (self._last_actuation_time is None or (now_time - self._last_actuation_time) >= ACTUATION_COOLDOWN)
         
         # Scenario B: If the video is ON, ignore raw IMU tags (the video prediction takes precedence).
         # Check exclusively whether the actuator cooldown window has passed.
@@ -215,4 +215,4 @@ class EventDispatcher:
         """ 
         Activates the video pipeline if IMU sensors detect anomalies (SLOW_DRIFT or SUDDEN_DROP).
         """
-        if tag in (1, 3): self._start_video_thread()
+        if tag in (1, 2): self._start_video_thread()
