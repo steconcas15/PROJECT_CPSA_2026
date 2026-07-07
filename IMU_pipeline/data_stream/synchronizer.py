@@ -1,6 +1,7 @@
-# imu_pipeline/data_stream/synchronizer.py
-# Collects asynchronous data from a single Bluecoin device (accelerometer and gyroscope) 
-# and emits atomically aggregated 6-axis rows immediately to the data buffer.
+# synchronizer.py
+#
+# Author: Stefano Concas, Matteo Matta, Sara Cadedo, Fabio Piras
+# Repository: https://github.com/steconcas15/PROJECT_CPSA_2026
 
 import threading
 from dataclasses import dataclass
