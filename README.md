@@ -1,6 +1,5 @@
 # Cyber-Physical-System for Real-Time Driver Drowsiness Detection and Road Safety
 
----
 This project is a modular cyber-physical system (CPS) designed for real-time driver drowsiness detection and active road safety. It combines wearable BLE sensing, continuous IMU processing for head-movement classification, DPU-accelerated computer vision, a smart event dispatcher and instant acoustic actuation.
 
 The current runtime is centered on single BlueCoin IMU acquisition and a selectively triggered video pipeline. Continuous IMU classification (detecting preliminary head-nodding patterns) drives the event system. The central dispatcher acts as the core coordinator: upon receiving a preliminary drowsiness trigger, it wakes up the video pipeline, executing YOLO and ResNet on the Kria DPU for visual validation (e.g., eyelid closure). Once the driver's fatigue is fully confirmed, the dispatcher routes the validated event to the actuation manager to trigger an audio alarm.
