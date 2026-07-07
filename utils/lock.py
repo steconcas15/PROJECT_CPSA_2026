@@ -1,10 +1,4 @@
 # lock.py
-# Global lock for bluetooth scan safety
-#
-# Author: Francesco Urru
-# GitHub: https://github.com/frarvo
-# Repository: https://github.com/frarvo/CPSA_2026
-# License: MIT
 
 import threading
 
