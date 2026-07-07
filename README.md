@@ -1,5 +1,12 @@
 # Cyber-Physical-System for Real-Time Driver Drowsiness Detection and Road Safety
 
+---
+This project is a modular cyber-physical system (CPS) designed for real-time driver drowsiness detection and active road safety. It combines wearable BLE sensing, continuous IMU processing for head-movement classification, DPU-accelerated computer vision, a smart event dispatcher and instant acoustic actuation.
+
+The current runtime is centered on single BlueCoin IMU acquisition and a selectively triggered video pipeline. Continuous IMU classification (detecting preliminary head-nodding patterns) drives the event system. The central dispatcher acts as the core coordinator: upon receiving a preliminary drowsiness trigger, it wakes up the video pipeline, executing YOLO and ResNet on the Kria DPU for visual validation (e.g., eyelid closure). Once the driver's fatigue is fully confirmed, the dispatcher routes the validated event to the actuation manager to trigger an audio alarm.
+
+---
+
 ## Table of Contents
 
 * [System View](#system-view)
@@ -583,7 +590,7 @@ The dispatcher dynamically controls the execution of the video pipeline (YOLO/Re
 
 #### Anti-Blink Filter Mechanism
  
-The system implements an Anti-Blink Filter within the `EventDispatcher` pipeline to distinguish between a normal human eye blink and a sleep event. This prevents false positives and unnecessary audio flooding.
+The system implements an Anti-Blink Filter within the `EventDispatcher` pipeline to distinguish between a normal eye blink and a drowsiness event. This prevents false positives and unnecessary audio flooding.
  
 ##### Timing Thresholds
 1. State Interception: When the computer vision model (YOLO/ResNet) outputs a `DROWSY` prediction, the `EventDispatcher` immediately captures the event inside `_process_policy_for_event`.
@@ -610,21 +617,3 @@ The dashboard manages the main graphical user interface using OpenCV, combining 
 *   System Exit: Pressing `q` inside the window terminates the application cleanly.
 
 ---
-
-### Logging
-The system includes a centralized logging infrastructure to track the application's runtime behavior and sensor transitions.
-
-#### Features and Data Tracked
-*   Monitored Operations: The pipeline records system operations, event queue updates, physical actuation details, and raw console outputs.
-*   File Export: Log archives are automatically saved to disk using an organized folder structure located under the directory path defined by `log_base_path`.
-
-#### Configuration Variables
-All main logging behaviors are controlled directly inside `config.yaml` using the following properties:
-
-```yaml
-enable_system_log: true
-enable_actuation_detail: false
-debug_system_console: true
-debug_event_console: true
-log_base_path: "~/Desktop/CPSA_logs"
-```
