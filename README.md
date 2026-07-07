@@ -2,11 +2,12 @@
 
 ## Table of Contents
 
+## Table of Contents
+
 * [System View](#system-view)
 * [Architecture and Working Principle](#architecture-and-working-principle)
   * [System Architecture](#system-architecture)
   * [Runtime Flow](#runtime-flow)
-  * [Important Runtime Details](#important-runtime-details)
   * [Project Structure](#project-structure)
 * [Python Dependencies and Environment Setup](#python-dependencies-and-environment-setup)
   * [Core Python Modules Used](#core-python-modules-used)
@@ -16,15 +17,28 @@
   * [Run Procedure](#run-procedure)
 * [IMU Pipeline](#imu-pipeline)
   * [Architecture](#architecture)
-  * [Data Flow](#data-flow)
+* [Data Flow](#data-flow)
+  * [1. BLE acquisition — feature_listeners.py](#1-ble-acquisition--feature_listenerspy)
+  * [2. Pairing — synchronizer.py](#2-pairing--synchronizerpy)
+  * [3. Sliding window — data_buffer.py](#3-sliding-window--data_bufferpy)
+  * [4. Classification — drowsiness_classifier.py](#4-classification--drowsiness_classifierpy)
+  * [Event output](#event-output)
+  * [5. Hardware Orchestration & Pipeline Wiring — sensor_manager.py](#5-hardware-orchestration--pipeline-wiring--sensor_managerpy)
   * [Configuration and tuning parameters](#configuration-and-tuning-parameters)
-* [Video Pipeline](#video-pipeline)
-  * [YOLO & ResNet18](#yolo--resnet18)
-* [Actuation Policy](#actuation-policy)
-* [Event System and Dispatcher](#event-system-and-dispatcher)
+  * [Video Pipeline](#video-pipeline)
+  * [Architecture](#architecture-1)
+* [Data Flow](#data-flow-1)
+  * [1. Camera Acquisition & Initialization — main.py / YoloDpuThread](#1-camera-acquisition--initialization--mainpy--yolodputhread)
+  * [2. Hardware Acceleration Setup (DPU)](#2-hardware-acceleration-setup-dpu)
+  * [3. Person Detection & NMS — YoloDpuThread](#3-person-detection--nms--yolodputhread)
+  * [4. Face Localization — Haar Cascade (CPU)](#4-face-localization--haar-cascade-cpu)
+  * [5. Geometric Fallback Strategy](#5-geometric-fallback-strategy)
+  * [6. State Classification — ResNet18 (DPU)](#6-state-classification--resnet18-dpu)
+  * [Actuation Policy](#actuation-policy)
+  * [Event System and Dispatcher](#event-system-and-dispatcher)
   * [Anti-Blink Filter Mechanism](#anti-blink-filter-mechanism)
-* [Dashboard](#dashboard)
-* [Logging](#logging)
+  * [Dashboard](#dashboard)
+  * [Logging](#logging)
 
 ---
 
@@ -504,27 +518,18 @@ If the Haar Cascade fails to detect a face (e.g., subject in profile, turned awa
 *   Stage 1 (Reconstruction): The top 40% height of the original YOLO bounding box (the head-shoulders area) is isolated. After calculating the horizontal center of this portion, a width equal to 120% of the isolated height is forced.
 *   Stage 2 (Margin Expansion): The newly calculated bounding box is symmetrically expanded outwards by 30% on all sides. This zoom-out operation ensures the inclusion of the surrounding context (hair, ears, contour elements).
 
-> Visual Breakdown of the Fallback Strategy: 
+ Visual Breakdown of the Fallback Strategy: 
 
-  > ```text
-
-  >    Original YOLO Box             Stage 1: Estimated ROI       Stage 2: Final DPU Input
-
-  > ┌─────────────────────┐        ┌───────────────────────┐     ┌────────────────────────────┐
-
-  > │                     │ ▲      │      [Head Area]      │ ▲   │  ........................  │
-
-  > │  (Top 40% Height)   │ │0.4H  │ ◄──── 120% Width ────►│ │   │  :  +30% Context Margin :  │
-
-  > ├─────────────────────┤ ▼      └───────────────────────┘ ▼   │  :   (Wider Framing)    :  │
-
-  > │                     │                                      │  :......................:  │
-
-  > │  (Bottom 60% Body)  │                                      └────────────────────────────┘
-
-  > └─────────────────────┘
-
-  > ```
+```text
+Original YOLO Box               Stage 1: Estimated ROI       Stage 2: Final DPU Input
+┌─────────────────────┐        ┌───────────────────────┐     ┌────────────────────────────┐
+│                     │ ▲      │      [Head Area]      │ ▲   │  ........................  │
+│  (Top 40% Height)   │ │0.4H  │ ◄──── 120% Width ────►│ │   │  :  +30% Context Margin :  │
+├─────────────────────┤ ▼      └───────────────────────┘ ▼   │  :   (Wider Framing)    :  │
+│                     │                                      │  :......................:  │
+│  (Bottom 60% Body)  │                                      └────────────────────────────┘
+└─────────────────────┘
+```
 
 
 
