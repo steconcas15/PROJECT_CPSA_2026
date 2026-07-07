@@ -1,3 +1,8 @@
+# sensor_manager.py
+#
+# Author: Stefano Concas, Matteo Matta, Sara Cadedo, Fabio Piras
+# Repository: https://github.com/steconcas15/PROJECT_CPSA_2026
+
 from blue_st_sdk.features.feature_accelerometer import FeatureAccelerometer
 from blue_st_sdk.features.feature_gyroscope import FeatureGyroscope
 
