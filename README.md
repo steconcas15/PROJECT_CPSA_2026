@@ -18,6 +18,7 @@
   * [Data Flow](#data-flow)
 * [Video Pipeline](#video-pipeline)
   * [Data Flow](#data-flow-1)
+  * [Architecture](#architecture-1)
 * [Dashboard](#dashboard)
 * [Logging](#logging)
 
