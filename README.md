@@ -16,7 +16,7 @@
 * [IMU Pipeline](#imu-pipeline)
   * [Architecture](#architecture)
   * [Data Flow](#data-flow)
-* [Video Pipeline](#video_pipeline)
+* [Video Pipeline](#video-pipeline)
   * [Data Flow](#data-flow-1)
 * [Dashboard](#dashboard)
 * [Logging](#logging)
@@ -426,6 +426,9 @@ The `SensorManager` is responsible for coordinating the hardware lifecycle and c
 ---
 
 ### Video Pipeline
+
+The Video Pipeline is the visual processing part of the system, designed to monitor and classify the user's state in real time. It uses a multi-threaded architecture to split the work efficiently: heavy deep learning models run on the hardware-accelerated Xilinx DPU (Deep Learning Processing Unit), while standard computer vision tasks run on the CPU.
+
 ### Architecture
 
 ```text
