@@ -305,19 +305,19 @@ The module receives raw accelerometer and gyroscope data over BLE, estimates the
 
 ---
 
-## Data Flow
+### Data Flow
 
-### 1. BLE acquisition — `feature_listeners.py`
+#### 1. BLE acquisition — `feature_listeners.py`
 
 `AccelerometerFeatureListener` and `GyroscopeFeatureListener` are registered on the BlueCoin BLE features by `BlueCoinThread`. Every time the sensor firmware sends a BLE notification, `on_update()` is invoked, converts the raw data to a float tuple and calls `synchronizer.update()`.
 
-### 2. Pairing — `synchronizer.py`
+#### 2. Pairing — `synchronizer.py`
 
 `IMUSynchronizer` maintains a `DeviceState` object for `bc_left`. Each `update()` call stores the incoming acc or gyr measurement. When both fields are populated (`is_ready() = acc is not None and gyr is not None`), the pair is emitted to the buffer and the state is cleared, ready for the next sample pair.
 
 This guarantees that accelerometer and gyroscope data are always forwarded as coherent pairs — the buffer never receives an acc sample without its corresponding gyr, or vice versa. Any packet that arrives with an unrecognised `device_id` is silently dropped via the early-return guard.
 
-### 3. Sliding window — `data_buffer.py`
+#### 3. Sliding window — `data_buffer.py`
 
 `DataBuffer` accumulates incoming rows in an internal list. When the list reaches `window_size` samples (150 by default), it emits a window and advances the cursor by `hop_size` samples (75), retaining the last 75 samples as overlap with the next window.
 
@@ -337,11 +337,11 @@ window_payload = {
 
 Note: Only `accX`, `accZ`, `gyrX` are extracted and forwarded as these are the exclusive inputs required by the classifier.
 
-### 4. Classification — `drowsiness_classifier.py`
+#### 4. Classification — `drowsiness_classifier.py`
 
 `DrowsinessClassifier` is the algorithmic core. It receives each window from the buffer, processes only the new samples (anti-overlap computation), applies the complementary filter sample by sample, updates the baseline and runs the state machine.
 
-#### Anti-overlap computation
+##### Anti-overlap computation
 
 Since windows overlap by 50%, each window contains samples already processed by the previous one. The classifier processes only the last `hop_size` samples:
 
@@ -352,7 +352,7 @@ else:
     start_idx = len(accX) - hop_size   # subsequent windows: new tail only
 ```
 
-#### Complementary filter
+##### Complementary filter
 
 For each new sample, the filter fuses two sources to estimate head pitch:
 
@@ -367,11 +367,11 @@ The accelerometer gate (`|a_total - 1g| > gate_thresh_g`) disables the accelerom
 
 The `dt` is computed from real BLE timestamps rather than a fixed nominal value, with a fallback to `1/target_fs` (1/100Hz in this case) on gaps or out-of-order packets.
 
-#### Dynamic baseline
+##### Dynamic baseline
 
 The driver's neutral posture is estimated and updated once per second over a 30-second rolling history. Only samples within ±5° of the current baseline contribute to the recalculation, preventing drowsiness episodes from pulling the reference point along with them.
 
-#### State machine — detected events
+##### State machine — detected events
 
 All patterns are evaluated on the deviation `Δθ = θ − baseline`.
 
@@ -389,11 +389,11 @@ Default state. Emitted every window when no pattern is detected, allowing `Event
 
 After any event fires, a **5-second refractory period** blocks new triggers. During this window the state machine returns the last detected tag rather than `0`, keeping the dispatcher informed of the sustained alert state.
 
-### Event output
+#### Event output
 
 One event is produced per window regardless of detected state. The event is inserted into the shared queue via `enqueue_drop_oldest()`: if the queue is full, the oldest item is popped and logged with reason `"queue_full"` before the new event is inserted.
 
-### 5. Hardware Orchestration & Pipeline Wiring — sensor_manager.py
+#### 5. Hardware Orchestration & Pipeline Wiring — sensor_manager.py
 
 The `SensorManager` is responsible for coordinating the hardware lifecycle and connecting the streaming data to the drowsiness classifier:
 
@@ -403,9 +403,9 @@ The `SensorManager` is responsible for coordinating the hardware lifecycle and c
 * **Resource Cleanup (`stop_all`):** Stops all active sensor threads and clears the internal tracking list to ensure a clean shutdown.
 ---
 
-### Configuration and tuning parameters
+#### Configuration and tuning parameters
 
-#### `DrowsinessClassifier` — algorithmic parameters
+##### `DrowsinessClassifier` — algorithmic parameters
 
 | Configurable parameters | Default | Effect |
 |---|---|---|
@@ -426,7 +426,7 @@ The `SensorManager` is responsible for coordinating the hardware lifecycle and c
 
 ---
 
-### Video Pipeline
+## Video Pipeline
 
 The Video Pipeline is the visual processing part of the system, designed to monitor and classify the user's state in real time. It uses a multi-threaded architecture to split the work efficiently: heavy deep learning models run on the hardware-accelerated Xilinx DPU (Deep Learning Processing Unit), while standard computer vision tasks run on the CPU.
 
@@ -476,27 +476,27 @@ The Video Pipeline is the visual processing part of the system, designed to moni
 
 ---
 
-## Data Flow
+### Data Flow
 
-### 1. Camera Acquisition & Initialization — `main.py` / `YoloDpuThread`
+#### 1. Camera Acquisition & Initialization — `main.py` / `YoloDpuThread`
 
 The `YoloDpuThread` class is instantiated and started by the main thread (`main.py`). Upon startup, the thread sequentially deserializes the `.xmodel` files to load the YOLOv3 and ResNet18 models into the system memory.
 
-### 2. Hardware Acceleration Setup (DPU)
+#### 2. Hardware Acceleration Setup (DPU)
 
 During the preliminary model setup phase, the code analyzes the XIR (Xilinx Intermediate Representation) graphs and instantiates the corresponding VART (Vitis AI Runtime) runners for both YOLOv3 and ResNet18. This configuration maps heavy mathematical operations directly onto the hardware registers and ALUs of the physical Xilinx DPU (Deep Learning Processing Unit) chip.
 
-### 3. Person Detection & NMS — `YoloDpuThread`
+#### 3. Person Detection & NMS — `YoloDpuThread`
 
 The acquired frame is normalized and forwarded to the DPU hardware module configured for YOLOv3. The model performs real-time spatial localization to identify human figures in the field of view. 
 
 Since the algorithm generates multiple overlapping predictive boxes for the same subject, a Non-Maximum Suppression (NMS) algorithm is applied. The cleanup process filters overlaps based on Intersection over Union (IoU) and keeps only the single bounding box associated with the highest confidence score. If no person is detected, the flow interrupts the cascade and immediately skips to the next frame to optimize resources.
 
-### 4. Face Localization — Haar Cascade (CPU)
+#### 4. Face Localization — Haar Cascade (CPU)
 
 Once the person's isolated bounding box is obtained, processing temporarily shifts to the main CPU. The system crops the region of interest (ROI) corresponding to the person and applies a traditional Haar Cascade algorithm to locate frontal facial features (eyes, nose, mouth). A margin expansion is operated to ensure that all the features (like hair, ears) are included.
 
-### 5. Geometric Fallback Strategy
+#### 5. Geometric Fallback Strategy
 
 If the Haar Cascade fails to detect a face (e.g., subject in profile, turned away, or under harsh lighting variations), a geometric fallback strategy is automatically triggered based on the standard proportions of the human body. The calculation is divided into two sequential phases:
 
@@ -518,7 +518,7 @@ Original YOLO Box               Stage 1: Estimated ROI       Stage 2: Final DPU 
 
 
 
-### 6. State Classification — ResNet18 (DPU)
+#### 6. State Classification — ResNet18 (DPU)
 
 The second deep learning model (ResNet18) is executed on the DPU conditionally: if the pipeline at step 3 detected no people, ResNet18 inference is completely skipped to reduce the SoC's power consumption.
 
@@ -531,7 +531,7 @@ When a valid ROI (`crop_payload`) is available — whether extracted by Haar Cas
 
 ---
 
-### Actuation Policy
+#### Actuation Policy
 
 `DrowsyAlertPolicy` decides when to trigger audio alarms based on drowsiness detection and speaker cooldown limits.
 
@@ -554,25 +554,25 @@ speaker:
 
 ---
 
-### Event System and Dispatcher
+#### Event System and Dispatcher
 The event queue is shared across runtime components and consumed by the dispatcher.
 
-#### Queue Configuration
+##### Queue Configuration
 *   `event_queue_size`: Managed asynchronously via a shared `get_event_queue()` mechanism. The thread uses a 0.5-second polling timeout to handle idle states, check internal resource timers, and process continuous video-only policies when no new sensor data arrives.
 
-#### Classification Mapping
+##### Classification Mapping
 The dispatcher translates numerical sensor tags (e.g., from an IMU) into human-readable labels:
 *   `0` -> `AWAKE`
 *   `1` -> `SLOW_DRIFT`
 *   `2` -> `SUDDEN_DROP`
 
-#### Video-Stage Behavior
+##### Video-Stage Behavior
 The dispatcher dynamically controls the execution of the video pipeline (YOLO/ResNet) to optimize processing resources and maintain battery life:
 *   Trigger Rules: If an anomalous IMU sensor tag is encountered (`1: SLOW_DRIFT` or `2: SUDDEN_DROP`), the video thread is immediately initialized/activated.
 *   `NATURAL` State Auto-Off Countdown: If the active video model pipeline predicts a stable `NATURAL` state continuously for `AWAKE_OFF_DELAY_SEC` (set to 5.0 seconds), the video pipeline is turned off automatically to conserve resources.
 *   Anti-Blink Suppression Filter: When a `DROWSY` state is predicted by the video module, the system ensures a continuous duration threshold of less than 1.0 second is treated as a blink. This prevents brief eye blinks from accidentally resetting the camera shutdown timer and suppresses short false positives.
 
-#### Actuation & Cooldown Behavior
+##### Actuation & Cooldown Behavior
 *   Trigger Priorities:
     *   *Video Off*: The system relies on sensor anomalies (`1` or `2`) to trigger the policy.
     *   *Video On*: The dispatcher ignores raw sensor tags entirely. Policy evaluations are dictated exclusively by active AI video prediction states.
@@ -581,11 +581,11 @@ The dispatcher dynamically controls the execution of the video pipeline (YOLO/Re
 
 ---
 
-### Anti-Blink Filter Mechanism
+#### Anti-Blink Filter Mechanism
  
 The system implements an Anti-Blink Filter within the `EventDispatcher` pipeline to distinguish between a normal human eye blink and a sleep event. This prevents false positives and unnecessary audio flooding.
  
-#### Timing Thresholds
+##### Timing Thresholds
 1. State Interception: When the computer vision model (YOLO/ResNet) outputs a `DROWSY` prediction, the `EventDispatcher` immediately captures the event inside `_process_policy_for_event`.
 2. Monotonic Tracking: The dispatcher initiates a duration window tracking mechanism:
    * If `self._drowsy_since_ts` is empty (`None`), it locks the current time using `time.monotonic()`.
@@ -593,7 +593,7 @@ The system implements an Anti-Blink Filter within the `EventDispatcher` pipeline
 3. Suppression Phase ($\Delta t < 1.0\text{s}$): If the continuous duration of the `DROWSY` state is less than 1.0 second, the system flags the behavior as a standard eye blink.
 4. Trigger Phase ($\Delta t \ge 1.0\text{s}$): If the user's eyes remain closed and the `DROWSY` status persists continuously for 1.0 second or longer, the state is validated as an actual microsleep anomaly. The dispatcher passes the raw `DROWSY` status to `DrowsyAlertPolicy.handle()`, which checks the 5-second per-speaker cooldown and activates the speaker sounds.
  
-#### State Reset Conditions
+##### State Reset Conditions
 * The moment the video pipeline returns a `NATURAL` prediction, the `self._drowsy_since_ts` timestamp is immediately reset to `None`, clearing the window for the next event.
 
 ---
