@@ -1,10 +1,4 @@
 # actuator_manager.py
-# Manages scanning, initialization and lifecycle of speaker actuator devices.
-#
-# Author: Fabio Piras and Sara Caddeo
-# GitHub: https://github.com/steconcas15
-# Repository: https://github.com/steconcas15/PROJECT_CPSA_2026
-# License: MIT
 
 import threading
 from typing import Dict
