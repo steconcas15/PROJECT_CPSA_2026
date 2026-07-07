@@ -1,9 +1,7 @@
 # actuation_policy.py
 #
-# Policy engine responsible for managing drowsiness alerts. 
-# It ensures the necessary audio files are available at startup, watches the video 
-# pipeline for drowsiness indicators, and applies a brief cooldown period to each 
-# speaker to prevent overlapping sounds before issuing the final execution command.
+# Author: Stefano Concas, Matteo Matta, Sara Cadedo, Fabio Piras
+# Repository: https://github.com/steconcas15/PROJECT_CPSA_2026
 
 from typing import List, Dict, Optional
 import time
