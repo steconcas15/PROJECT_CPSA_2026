@@ -1,8 +1,7 @@
-# IMU_pipeline/classifiers/drowsiness_classifier.py
-# Online streaming classifier for drowsiness detection via complementary filter.
-# Aligned to process sample-by-sample subwindows streaming from the DataBuffer.
+# drowsiness_classifier.py
 #
-# Adapted for Drowsiness Detection - CPSA_2026
+# Author: Stefano Concas, Matteo Matta, Sara Cadedo, Fabio Piras
+# Repository: https://github.com/steconcas15/PROJECT_CPSA_2026
 
 import uuid
 import collections
