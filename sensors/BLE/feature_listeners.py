@@ -1,5 +1,7 @@
 # feature_listeners.py
-# Feature listeners modules for BlueCoin sensor data callbacks (accelerometer, gyroscope)
+#
+# Author: Stefano Concas, Matteo Matta, Sara Cadedo, Fabio Piras
+# Repository: https://github.com/steconcas15/PROJECT_CPSA_2026
 
 from blue_st_sdk.feature import FeatureListener
 from utils.logger import log_system
