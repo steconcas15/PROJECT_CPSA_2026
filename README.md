@@ -2,8 +2,6 @@
 
 ## Table of Contents
 
-## Table of Contents
-
 * [System View](#system-view)
 * [Architecture and Working Principle](#architecture-and-working-principle)
   * [System Architecture](#system-architecture)
