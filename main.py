@@ -1,5 +1,8 @@
 # main.py
 # Real-time Core Executive Layer for Drowsiness Detection Pipeline
+#
+# Author: Stefano Concas, Matteo Matta, Sara Cadedo, Fabio Piras
+# Repository: https://github.com/steconcas15/PROJECT_CPSA_2026
 
 import time
 
