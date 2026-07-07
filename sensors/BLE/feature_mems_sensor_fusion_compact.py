@@ -1,13 +1,7 @@
 # feature_mems_sensor_fusion_compact.py
-# Quaternion (compact) feature: firmware sends qx,qy,qz as int16 scaled by 10000.
-# Reconstruct qw >= 0 as sqrt(1 - x^2 - y^2 - z^2) in the same raw domain.
 #
-# Created based on STM guide at https://github.com/STMicroelectronics/BlueSTSDK_Python?tab=readme-ov-file#how-to-add-a-new-feature
-#
-# Author: Francesco Urru
-# GitHub: https://github.com/frarvo
-# Repository: https://github.com/frarvo/CPSA_2026
-# License: MIT
+# Author: Stefano Concas, Matteo Matta, Sara Cadedo, Fabio Piras
+# Repository: https://github.com/steconcas15/PROJECT_CPSA_2026
 
 from blue_st_sdk.feature import Feature, Sample, ExtractedData
 from blue_st_sdk.features.field import Field, FieldType
