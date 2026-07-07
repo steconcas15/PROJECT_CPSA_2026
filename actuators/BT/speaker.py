@@ -1,10 +1,7 @@
 # speaker.py
-# Actuator module for Bluetooth speaker control and audio playback.
 #
-# Author:
-# GitHub: https://github.com/frarvo
-# Repository: https://github.com/frarvo/STOPme
-# License: MIT
+# Author: Stefano Concas, Matteo Matta, Sara Cadedo, Fabio Piras
+# Repository: https://github.com/steconcas15/PROJECT_CPSA_2026
 
 import asyncio
 import threading
