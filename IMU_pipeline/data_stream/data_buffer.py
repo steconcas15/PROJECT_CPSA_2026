@@ -1,3 +1,8 @@
+# data_buffer.py
+#
+# Author: Stefano Concas, Matteo Matta, Sara Cadedo, Fabio Piras
+# Repository: https://github.com/steconcas15/PROJECT_CPSA_2026
+
 from __future__ import annotations
 
 from typing import List, Tuple, Callable, Optional
