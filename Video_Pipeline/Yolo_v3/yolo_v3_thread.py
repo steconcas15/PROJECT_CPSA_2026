@@ -1,18 +1,8 @@
-"""
-Module: yolo_resnet_dpu_pipeline.py
+# yolo_v3_thread.py
+#
+# Author: Stefano Concas, Matteo Matta, Sara Cadedo, Fabio Piras
+# Repository: https://github.com/steconcas15/PROJECT_CPSA_2026
 
-This script is a real-time pipeline vision system running on specialized hardware (Xilinx DPU). 
-It captures a camera stream, uses a YOLO model to find a person, tries to locate their face, 
-and then hands that cropped region over to a ResNet model to classify if the person is 'DROWSY' or 'NATURAL'.
-
-Scope:
-    1. Multi-Model Pipeline: It chains two AI models together inline (YOLOv3 -> ResNet18) 
-       to handle a cascading task (Find Person -> Find Face -> Classify State).
-    2. Hardware Acceleration: It interacts with 'xir' to offload the heavy math 
-       directly onto a physical DPU chip for real-time FPS.
-    3. Threaded Architecture: It isolates the camera reading and heavy AI inferencing inside a 
-       background worker thread (YOLO_DPU_Thread) so it never blocks the main program.
-"""
 
 import cv2
 import numpy as np
