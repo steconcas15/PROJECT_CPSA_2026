@@ -1,10 +1,4 @@
 # audio_paths.py
-# Centralized symbolic mapping for audio files used by the speaker actuator
-#
-# Author: Francesco Urru
-# GitHub: https://github.com/frarvo
-# Repository: https://github.com/frarvo/CPSA_2026
-# License: MIT
 
 from pathlib import Path
 from utils.logger import log_system
