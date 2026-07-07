@@ -1,3 +1,8 @@
+# event_queue.py
+#
+# Author: Stefano Concas, Matteo Matta, Sara Cadedo, Fabio Piras
+# Repository: https://github.com/steconcas15/PROJECT_CPSA_2026
+
 from queue import Queue, Full, Empty
 from typing import Optional, Tuple, Any
 from utils.config import get_event_queue_size
