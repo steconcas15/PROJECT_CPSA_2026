@@ -504,6 +504,30 @@ If the Haar Cascade fails to detect a face (e.g., subject in profile, turned awa
 *   Stage 1 (Reconstruction): The top 40% height of the original YOLO bounding box (the head-shoulders area) is isolated. After calculating the horizontal center of this portion, a width equal to 120% of the isolated height is forced.
 *   Stage 2 (Margin Expansion): The newly calculated bounding box is symmetrically expanded outwards by 30% on all sides. This zoom-out operation ensures the inclusion of the surrounding context (hair, ears, contour elements).
 
+> Visual Breakdown of the Fallback Strategy: 
+
+  > ```text
+
+  >    Original YOLO Box             Stage 1: Estimated ROI       Stage 2: Final DPU Input
+
+  > ┌─────────────────────┐        ┌───────────────────────┐     ┌────────────────────────────┐
+
+  > │                     │ ▲      │      [Head Area]      │ ▲   │  ........................  │
+
+  > │  (Top 40% Height)   │ │0.4H  │ ◄──── 120% Width ────►│ │   │  :  +30% Context Margin :  │
+
+  > ├─────────────────────┤ ▼      └───────────────────────┘ ▼   │  :   (Wider Framing)    :  │
+
+  > │                     │                                      │  :......................:  │
+
+  > │  (Bottom 60% Body)  │                                      └────────────────────────────┘
+
+  > └─────────────────────┘
+
+  > ```
+
+
+
 ### 6. State Classification — ResNet18 (DPU)
 
 The second deep learning model (ResNet18) is executed on the DPU conditionally: if the pipeline at step 3 detected no people, ResNet18 inference is completely skipped to reduce the SoC's power consumption.
