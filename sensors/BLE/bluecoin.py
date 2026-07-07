@@ -1,10 +1,7 @@
 # bluecoin.py
-# BLE interface module for BlueCoin sensor devices (STMicroelectronics)
 #
-# Author: Francesco Urru
-# Github: https://github.com/frarvo
-# Repository: https://github.com/frarvo/CPSA_2026
-# License: MIT
+# Author: Stefano Concas, Matteo Matta, Sara Cadedo, Fabio Piras
+# Repository: https://github.com/steconcas15/PROJECT_CPSA_2026
 
 import time
 import threading
