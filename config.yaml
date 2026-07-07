@@ -1,10 +1,7 @@
 # config.yaml
-# Configuration file for the system
-# Can choose logs folder, log details activation, enabled actuators, buffering parameters
 #
 # Author: Stefano Concas, Matteo Matta, Sara Cadedo, Fabio Piras
 # Repository: https://github.com/steconcas15/PROJECT_CPSA_2026
-# License: MIT
 
 # ---- LOGS & DEBUG CONFIGURATION ----
 log_base_path: ~/Desktop/CPSA_logs  # Path where logs are saved. User folder is automatically detected
