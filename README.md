@@ -16,9 +16,9 @@
 * [IMU Pipeline](#imu-pipeline)
   * [Architecture](#architecture)
   * [Data Flow](#data-flow)
-* [Video Pipeline](#video-pipeline)
-  * [Data Flow](#data-flow-1)
+* [Video Pipeline](#video-pipeline)  
   * [Architecture](#architecture-1)
+  * [Data Flow](#data-flow-1)
 * [Dashboard](#dashboard)
 * [Logging](#logging)
 
