@@ -431,78 +431,118 @@ The `SensorManager` is responsible for coordinating the hardware lifecycle and c
 ---
 
 ### Video Pipeline
- The current video pipeline is managed within a single background thread (YoloDpuThread) executing a three-stage hybrid cascade:
+ ### Architecture
+
 ```text
-[ Input Frame ]
-       │
-       ▼
- 1. Person Detection (YOLOv3 on DPU)
-       │
-       ├──► [ Person NOT Detected ] ──► (Skip/Next Frame)
-       │
-       └──► [ Person Detected ]
+[ main.py (Main Thread) ]
+         │
+         ▼ (Spawns and initializes background execution)
+ 1. YoloDpuThread Initialization
+         │
+         ▼ (Sequential Model Loading & XIR Graph / VART Runner Configuration)
+ 2. Hardware Acceleration Setup (DPU)
+         │
+         ▼ camera.read() [Smart Reconnection Loop: max 5 retries]
+ 3. Frame Acquisition & Preprocessing
+         │
+         ▼ dpu_runner.execute_async(input_frame)
+ 4. Person Detection (YOLOv3 on DPU)
+         │
+         ├──► [ Person NOT Detected ] ──► (Skip / Next Frame Loop)
+         │
+         └──► [ Person Detected ]
                  │
-                 ▼
-           2. Face Localization (Haar Cascade on CPU)
+                 ▼ nms_boxes(raw_detections, confidence_thresh)
+           Non-Maximum Suppression (Duplicate Box Cleanup)
                  │
-                 ├──► [ Face Found ] ───────► [ Target: Face ] ──┐
-                 │                                               │
-                 └──► [ Face NOT Found ]                         ▼
-                      (Profile/Undetected)               4. State Classification
-                             │                               (ResNet18 on DPU)
-                             ▼                                   │
-                      3. Bounding box estimation                 ▲
-                        (Top-40% of Body) ──► [ Target: Crop ] ──┘
+                 ▼ crop_roi(person_bbox)
+           5. Face Localization (Haar Cascade on CPU)
+                 │
+                 ├──► [ Face Found ] ───────► [ Target: Face ROI ] ──┐
+                 │                                                     │
+                 └──► [ Face NOT Found ]                               ▼
+                      (Profile / Occlusion)                     7. State Classification
+                             │                                   (ResNet18 on DPU)
+                             ▼ Stage 1: Top-40% Box Estimation         │
+                       6. Geometric Fallback Strategy                  ▼
+                             │                          resnet_runner.execute_async()
+                             ▼ Stage 2: +30% Context Margin            │
+                             │                                         ▼ Generate Event:
+                       [ Target: Fallback Crop ] ──────────────────────┘ state_tag ("NATURAL" | "DROWSY")
+                                                                               │
+                                                                               ▼ lock.acquire()
+                                                                        8. Shared State Update
+                                                                           (Thread-Safe Mutex)
 ```
-The video thread is created and started by main.py. It deserializes and loads both DPU models and then remains idle until activated by the dispatcher.
 
 ---
 
-### YOLO & ResNet18
+## Data Flow
 
-YOLO & ResNet18 DPU Thread responsibilities:
+### 1. Camera Acquisition & Initialization — `main.py` / `YoloDpuThread`
 
-* Load YOLO & ResNet18 models sequentially:
-  During startup, the system reads the pre-trained and compiled AI model files (the `.xmodel` files for YOLOv3 and ResNet18). It loads them into system memory one after the other to prepare them for execution.
+La classe `YoloDpuThread` viene istanziata e avviata dal thread principale (`main.py`). All'avvio, il thread esegue la deserializzazione sequenziale dei file `.xmodel` per caricare in memoria di sistema i modelli YOLOv3 e ResNet18.
 
-* Set up hardware acceleration (DPU):
-  During the initial setup phase, the code creates XIR graphs and VART runners for both models. It configures the specialized hardware (the physical Xilinx DPU chip) to create a fast track for running the heavy mathematical calculations of YOLO and ResNet at maximum speed.
+Una volta avviato, il thread gestisce la telecamera attraverso una logica di retry automatico: il flusso video viene aperto esclusivamente quando il thread è attivo. In caso di disconnessione o mancata risposta dell'hardware, un loop di riconnessione tenta fino a 5 riavvii consecutivi intervallati da un delay di ripristino, evitando il crash dell'applicazione.
 
-* Manage the camera with smart retry logic:
-  The camera stream is opened only when the thread is actively processing. If the camera loses connection or fails to respond, the code doesn’t crash: it applies an automatic reconnection loop that makes up to 5 consecutive attempts with a short delay between each to give the hardware device time to reset.
+### 2. Hardware Acceleration Setup (DPU)
 
-* Find the person using YOLOv3 on the DPU chip:
-  The system captures a frame from the camera and passes it directly to the YOLOv3 model running on the DPU hardware accelerator. YOLO scans the image in real time to locate any human figure and draws a bounding box around them.
+Durante la fase preliminare di setup dei modelli, il codice analizza i grafici XIR (Xilinx Intermediate Representation) e istanzia i relativi VART (Vitis AI Runtime) runner sia per YOLOv3 che per ResNet18. Questa configurazione mappa le operazioni matematiche pesanti direttamente sui registri e sulle ALU hardware del chip fisico Xilinx DPU (Deep Learning Processing Unit), massimizzando il throughput inferenziale.
 
-* Clean up duplicate boxes (NMS):
-  Object detection algorithms often find the same person multiple times, creating several overlapping boxes. The code uses a standard technique called *Non-Maximum Suppression* (NMS) to clean this up: it removes the duplicate boxes and keeps only the single most accurate rectangle with the highest confidence score.
+### 3. Person Detection & NMS — `YoloDpuThread`
 
-* Locate the face using the CPU:
-  Once the person's bounding box is isolated, the system runs a traditional face detection algorithm (Haar Cascade) on the main CPU. This script analyzes the area inside the person's box to specifically look for facial features (eyes, nose, mouth) in a frontal position.
+Il frame acquisito viene normalizzato e inoltrato al modulo hardware DPU configurato per YOLOv3. Il modello esegue la localizzazione spaziale in tempo reale per individuare figure umane nel campo visivo. 
 
-* Apply a smart geometric fallback crop if the face is undetected:
-  If Haar Cascade fails to find a face (for example, if the subject turns around, is in profile, or the lighting changes), a backup geometric plan triggers automatically, based on standard human body proportions. This process happens in two clear stages:
-  
-  * Stage 1 (Reconstruction): It isolates only the top 40% height of the person's body box (where the head and shoulders are expected to be), calculates the exact horizontal center and forces a custom width equal to 120% of that isolated height to create a perfectly proportioned box around the head and neck.
-  * Stage 2 (Margin Expansion): This newly calculated box is then expanded outward by 30% on all sides. This acts like "zooming out" slightly to include surrounding context (like hair, ears, or clothing), which helps the secondary AI model understand the image better.
+Poiché l'algoritmo genera box predittivi multipli e sovrapposti per lo stesso soggetto, viene applicato un algoritmo di **Non-Maximum Suppression (NMS)**. Il processo di pulizia filtra le sovrapposizioni basandosi sull'Intersection over Union (IoU) e mantiene unicamente la bounding box associata al punteggio di confidenza più elevato. Se non viene rilevata alcuna persona, il flusso interrompe la cascata e passa immediatamente al frame successivo per ottimizzare le risorse.
 
-  > Visual Breakdown of the Fallback Strategy:
-  > ```text
-  >    Original YOLO Box             Stage 1: Estimated ROI       Stage 2: Final DPU Input
-  > ┌─────────────────────┐        ┌───────────────────────┐     ┌────────────────────────────┐
-  > │                     │ ▲      │      [Head Area]      │ ▲   │  ........................  │
-  > │  (Top 40% Height)   │ │0.4H  │ ◄──── 120% Width ────►│ │   │  :  +30% Context Margin :  │
-  > ├─────────────────────┤ ▼      └───────────────────────┘ ▼   │  :   (Wider Framing)    :  │
-  > │                     │                                      │  :......................:  │
-  > │  (Bottom 60% Body)  │                                      └────────────────────────────┘
-  > └─────────────────────┘
-  > ```
+### 4. Face Localization — Haar Cascade (CPU)
 
-* Run the state classifier (ResNet18) conditionally:
-  The secondary AI model (ResNet18) runs on the DPU chip only when necessary. If YOLO detects no people in the room, ResNet is completely skipped to save power consumption. If a person is present (with either a detected face or an estimated fallback region), ResNet processes that specific crop to classify whether the subject is awake (*NATURAL*) or showing signs of drowsiness (*DROWSY*).
+Ottenuta la bounding box isolata della persona, l'elaborazione si sposta temporaneamente sulla CPU principale. Il sistema ritaglia la regione di interesse (ROI) corrispondente alla persona e vi applica un algoritmo tradizionale di Haar Cascade per l'individuazione dei tratti somatici frontali (occhi, naso, bocca).
 
-* Save results safely using Thread Locks:
-  While the background thread runs at maximum speed capturing and analyzing frames, it continuously updates the system status (whether a person is found, the box coordinates and the drowsiness prediction). To prevent data corruption or memory conflicts with the main program trying to read these values at the same time, all shared variables are securely protected using mutual exclusion "locks".
+### 5. Geometric Fallback Strategy
+
+Se l'Haar Cascade non rileva il volto (soggetto di profilo, girato o in condizioni di forte variazione di luce), si attiva automaticamente una strategia geometrica di fallback basata sulle proporzioni antropometriche standard del corpo umano. Il calcolo si articola in due fasi sequenziali:
+
+*   **Stage 1 (Reconstruction):** Viene isolato il 40% superiore in altezza della bounding box originaria di YOLO (zona testa-spalle). Calcolato il centro orizzontale di questa porzione, viene forzata una larghezza pari al 120% dell'altezza isolata, ottenendo un box proporzionato intorno all'asse testa-collo.
+*   **Stage 2 (Margin Expansion):** La nuova bounding box viene espansa simmetricamente verso l'esterno del 30% su tutti i lati. Questa operazione di zoom-out garantisce l'inclusione del contesto perimetrale (capelli, orecchie, elementi di contorno), ottimizzando la stabilità della feature map per il classificatore DPU a valle.
+
+La struttura dati finale della ROI, pronta per il confezionamento della stringa di input da passare al classificatore, viene così impacchettata:
+
+```python
+crop_payload = {
+    'image_roi':  np.array([...], dtype=uint8),       # BGR cropped image matrix
+    'target_src': 'HAAR_FACE' or 'GEOM_FALLBACK',     # Origin signature of the crop
+    'bbox_coords': (x1, y1, x2, y2),                  # Absolute coordinates relative to frame
+    'person_conf': float32,                            # YOLOv3 confidence score
+}
+```
+
+### 6. State Classification — ResNet18 (DPU)
+
+Il secondo modello di deep learning (ResNet18) viene eseguito sulla DPU in modalità condizionale: se la pipeline al punto 3 non ha rilevato persone, l'inferenza di ResNet18 viene totalmente saltata per abbattere i consumi energetici del SoC.
+
+Quando una ROI valida (`crop_payload`) è disponibile — sia essa estratta da Haar Cascade o ricostruita geometricamente — il runner DPU di ResNet18 elabora il crop per classificare lo stato del soggetto in tempo reale, assegnando una delle etichette previste dal sistema:
+
+| State Tag | Classification Condition | Pipeline Action |
+| :--- | :--- | :--- |
+| **`NATURAL`** | Subject alert, clear facial dynamics | Normal monitoring continued |
+| **`DROWSY`** | Persistent biometric indicators of fatigue | Trigger structural alert events |
+
+### 7. Thread Safety & Synchronization
+
+Poiché `YoloDpuThread` opera in background a frame-rate massimo mentre il thread principale necessita di leggere costantemente lo stato aggiornato (presenza della persona, coordinate spaziali e classificazione della sonnolenza), l'accesso alle variabili di stato condivise è regolato da un meccanismo di mutua esclusione. 
+
+Ogni scrittura dei risultati all'interno del loop video e ogni successiva lettura da parte del modulo dispatcher avvengono solo dopo aver acquisito esplicitamente un **Thread Lock (Mutex)**, scongiurando fenomeni di *race condition* o corruzione della memoria.
+
+---
+
+### 8. Pipeline Wiring & Configuration — `sensor_manager.py` / `main.py`
+
+Il coordinamento del ciclo di vita dei thread e il cablaggio dei moduli inferenziali sono centralizzati nel file di orchestrazione del sistema:
+
+*   **Pipeline Wiring (`__init__`):** Inizializza le strutture dati globali condivise, istanzia i mutex di sincronizzazione e mappa la coda degli eventi in uscita verso l'hardware di attuazione.
+*   **Thread Initialization (`start_pipeline`):** Configura e avvia il thread `YoloDpuThread`, avviando le routine sequenziali di boot hardware della DPU e agganciando l'engine video alla sorgente di acquisizione fisica.
+*   **Resource Cleanup (`terminate_pipeline`):** Invia un segnale di stop controllato al thread di background, attende il completamento dell'ultimo slot inferenziale attivo sulla DPU, rilascia i runner VART e chiude in sicurezza i descrittori hardware della telecamera.
 
 ---
 
