@@ -44,15 +44,18 @@ The entire workflow is governed by a central smart dispatcher. A single wearable
 * Centralized, clean shutdown sequence for the dispatcher, video threads, sensors, actuators, and dashboard resources.
 
 
-### Target environment
+### Target environment & Tools
 
 * Ubuntu 22.04
 * Python 3.10
 * Xilinx Kria KV260 for DPU-accelerated video inference
 * USB camera
 * BLE adapter compatible with BlueZ and BlueST SDK
-* BlueCoin wearable device
+* BlueCoin STEVAL-BCNST01V1
 * Bluetooth speaker
+* Vitis-AI
+* Yolo v3
+* ResNet18
 ---
 
 ## Architecture and Working Principle
