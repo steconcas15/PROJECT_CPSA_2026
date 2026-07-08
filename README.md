@@ -51,7 +51,7 @@ The entire workflow is governed by a central smart dispatcher. A single wearable
 * Xilinx Kria KV260 for DPU-accelerated video inference
 * USB camera
 * BLE adapter compatible with BlueZ and BlueST SDK
-* BlueCoin STEVAL-BCNST01V1
+* STM BlueCoin STEVAL-BCNST01V1
 * Bluetooth speaker
 * Vitis-AI
 * Yolo v3
