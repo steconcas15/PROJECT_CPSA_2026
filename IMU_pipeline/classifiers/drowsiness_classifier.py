@@ -197,10 +197,8 @@ class DrowsinessClassifier:
             recent_delta = [th - self.baseline for th in recent_theta]
             recent_gyro = [abs(g) for g in list(self.gyro_history)[-sudden_samples:]]
 
-            if (delta > self.sudden_drop_angle_thresh 
-                    and abs_omega > self.sudden_drop_gyro_thresh 
-                    and max(recent_gyro) > self.sudden_drop_gyro_thresh 
-                    and (max(recent_delta) - min(recent_delta)) > self.sudden_drop_angle_thresh):
+            if (and max(recent_gyro) > self.sudden_drop_gyro_thresh 
+                and (max(recent_delta) - min(recent_delta)) > self.sudden_drop_angle_thresh):
                 
                 log_system(f"🚨 [SUDDEN DROP] Head dropped abruptly! t={t_now:.2f}s, Δθ={delta:.1f}°", level="WARNING")
                 self.last_event_time = t_now
