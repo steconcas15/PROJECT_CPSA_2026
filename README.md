@@ -26,8 +26,6 @@ The entire workflow is governed by a central smart dispatcher. A single wearable
   * [Architecture](#architecture-1)
   * [Data Flow](#data-flow-1)
 * [Dashboard](#dashboard)
-* [Logging](#logging)
-
 ---
 
 ## System View
