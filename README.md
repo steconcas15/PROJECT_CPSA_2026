@@ -25,6 +25,7 @@ The entire workflow is governed by a central smart dispatcher. A single wearable
 * [Video Pipeline](#video-pipeline)  
   * [Architecture](#architecture-1)
   * [Data Flow](#data-flow-1)
+* [Actuation Policy](#actuation-policy)
 * [Dashboard](#dashboard)
 ---
 
