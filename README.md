@@ -2,7 +2,7 @@
 
 Closed-loop Cyber-Physical System (CPS) engineered for real-time driver fatigue monitoring. By synergizing low-power inertial tracking with high-performance edge AI, the architecture provides a robust, dual-stage detection mechanism designed to prevent road accidents.
 
-The entire workflow is governed by a central smart dispatcher. A single wearable STM BlueCoin continuously monitors the driver's head kinematics via a BLE connection. To optimize computational resources and minimize false alarms, the heavy vision pipeline remains on standby. The moment the IMU classifies a physical drowsiness pattern (e.g., head nodding), the dispatcher dynamically triggers the Kria KV260's DPU. The hardware accelerator then rapidly processes the video feed using YOLO (for face localization) and ResNet (for state classification) to visually validate the driver's condition. Upon a positive dual-confirmation, the dispatcher instantly fires a high-decibel audio alarm, actively closing the safety loop.
+The entire workflow is governed by a central smart dispatcher. A single wearable STM BlueCoin continuously monitors the driver's head kinematics via a BLE connection. To optimize computational resources and minimize false alarms, the heavy vision pipeline remains on standby. The moment the IMU classifies a physical drowsiness pattern (e.g., head nodding), the dispatcher dynamically triggers the Kria KV260's DPU. The hardware accelerator then rapidly processes the video feed using YOLO (for face localization) and ResNet (for state classification) to visually validate the driver's condition. Upon a positive dual-confirmation, the dispatcher instantly fires an audio alarm to alert the user.
 
 ---
 
