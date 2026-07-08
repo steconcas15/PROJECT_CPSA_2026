@@ -139,26 +139,30 @@ def main():
             time.sleep(1)
 
         if all_connected:
+            log_system("[MAIN] System ready for drowsiness detection")
             log_system("[MAIN] Event-driven control system active. Awaiting sensor signals...")
-        else:
-            log_system("[MAIN] WARNING: Connection timeout reached. System will force-start the dashboard.", level="WARNING")
+
+            # 7. Main Execution Loop: Update on-screen Graphical Dashboard
             
-        log_system("[MAIN] System ready for drowsiness detection!")
+            while True:
+                # Render current state (Shows standby if driver is awake, 
+                # shows real-time video feed if YOLO activates following an event)
+                dashboard.render(yolo_thread)
+    
+                # Exit software if 'q' is pressed on the dashboard window
+                key = dashboard.wait_key(1)
+                if key == ord("q"):
+                    log_system("[MAIN] Shutdown requested via keyboard.")
+                    break
+    
+                time.sleep(0.01)
+        else:
+            log_system("[MAIN] WARNING: Connection timeout reached. The system will be forcibly shut down.", level="WARNING")
+            return
+            
         # -------------------------------------------
-
-        # 7. Main Execution Loop: Update on-screen Graphical Dashboard
-        while True:
-            # Render current state (Shows standby if driver is awake, 
-            # shows real-time video feed if YOLO activates following an event)
-            dashboard.render(yolo_thread)
-
-            # Exit software if 'q' is pressed on the dashboard window
-            key = dashboard.wait_key(1)
-            if key == ord("q"):
-                log_system("[MAIN] Shutdown requested via keyboard.")
-                break
-
-            time.sleep(0.01)
+    
+    # Shutting down the system    
 
     except KeyboardInterrupt:
         log_system("[MAIN] Manual interruption detected (Ctrl+C).")
