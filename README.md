@@ -395,7 +395,7 @@ All patterns are evaluated on the deviation `Δθ = θ − baseline`.
 
 **Sudden drop — tag `2`** (highest priority)
 
-Analyses the last 0.40 s of history (40 samples at 100 Hz). Fires when all four conditions are met simultaneously: current deviation > 10°, current angular velocity > 10 dps, peak angular velocity in the window > 10 dps, total excursion of the deviation in the window > 10°. The initial two conditions provide an instantaneous assessment, whereas the subsequent two introduce a temporal analysis dimension.
+Analyses the last 0.40 s of history (40 samples at 100 Hz). Fires when the two conditions are met simultaneously: peak angular velocity in the window > 10 dps, total excursion of the deviation in the window > 10°, introducing a temporal analysis dimension.
 
 **Slow drift — tag `1`**
 
